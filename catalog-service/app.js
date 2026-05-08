@@ -1,8 +1,15 @@
-const { query } = require('./db');
 require('dotenv').config();
+
+const { query } = require('./db');
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
+
 const knex = require('./knex-client');
+const { connectToMongo } = require('./mongo-client');
+
+const mongoose = require('mongoose');
+const Review = require('./models/Review');
+const ProductDetails = require('./models/ProductDetails');
 
 const app = express();
 const prisma = new PrismaClient();
@@ -105,6 +112,58 @@ app.get('/stats/inventory', async (req, res) => {
     res.status(500).json({ error: 'blad statystyk', details: error.message });
   }
 });
+
+// t5: zasob domenowy sterownikiem natywnym (szukanie w detalach po tekscie i filtracja specyfikacji)
+app.get('/api/products/details/search', async (req, res) => {
+  try {
+    const { keyword, minWeight } = req.query;
+    const db = await connectToMongo();
+    
+    // t5: uzycie min. 3 roznych operatorow: $text, $search, $gte
+    let query = {};
+    
+    if (keyword) {
+      query.$text = { $search: keyword };
+    }
+    
+    if (minWeight) {
+      // zakladamy ze np waga buta jest w specyfikacji jako liczba (np '300')
+      // $gte = greater than or equal
+      query['specs.weight'] = { $gte: parseInt(minWeight) }; 
+    }
+
+    // surowe zapytanie przez kolekcje
+    const details = await db.collection('productdetails').find(query).toArray();
+    
+    res.json(details);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// t6: endpoint do dodawania recenzji i testowania hookow (mongoose)
+app.post('/api/reviews', async (req, res) => {
+  try {
+    const review = new Review({
+      productId: req.body.productId,
+      userId: req.body.userId,
+      rating: req.body.rating,
+      title: req.body.title,
+      body: req.body.body
+    });
+    
+    // save() automatycznie uruchamia walidatory i nasz pre-hook (cenzure)
+    await review.save(); 
+    res.status(201).json(review);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// t6: polaczenie z mongodb przez mongoose przy starcie aplikacji
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log('polaczono z mongodb przez mongoose'))
+  .catch(err => console.error('blad polaczenia z mongodb:', err));
 
 const PORT = process.env.CATALOG_PORT || 3001;
 app.listen(PORT, () => {
