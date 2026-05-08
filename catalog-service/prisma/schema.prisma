@@ -3,40 +3,47 @@ generator client {
   provider = "prisma-client-js"
 }
 
-// konfiguracja zrodla danych (postgres)
+// polaczenie z bazy danych
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-// model kategorii (wymog: min 2 modele z relacjami)
+// t4: model kategorii menu (np. burgery, napoje)
 model Category {
-  id       Int       @id @default(autoincrement())
-  name     String    @unique
-  products Product[]
+  id        Int        @id @default(autoincrement())
+  name      String     @unique
+  items     MenuItem[]
 }
 
-// glowny model produktu
-model Product {
-  id          Int       @id @default(autoincrement())
+// t4: glowny model pozycji w menu
+model MenuItem {
+  id          Int        @id @default(autoincrement())
   name        String
   description String?
   categoryId  Int
-  category    Category  @relation(fields: [categoryId], references: [id])
+  category    Category   @relation(fields: [categoryId], references: [id])
   variants    Variant[]
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  modifiers   Modifier[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 }
 
-// model wariantu (np. konkretny rozmiar i kolor buta)
-// zawiera scisle dane magazynowe i cenowe
+// t4: warianty (np. mala/duza kawa)
 model Variant {
-  id        Int      @id @default(autoincrement())
-  sku       String   @unique
-  price     Decimal
-  stock     Int      @default(0)
-  size      String?
-  color     String?
-  productId Int
-  product   Product  @relation(fields: [productId], references: [id])
+  id         Int      @id @default(autoincrement())
+  sku        String   @unique
+  price      Decimal
+  size       String?
+  menuItemId Int
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
+}
+
+// wymaganie funkcjonalne: modyfikatory (np. dodatkowy sos, bekon)
+model Modifier {
+  id         Int      @id @default(autoincrement())
+  name       String
+  price      Decimal
+  menuItemId Int
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
 }
