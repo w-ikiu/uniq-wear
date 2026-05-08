@@ -1,3 +1,4 @@
+const { query } = require('./db');
 require('dotenv').config();
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
@@ -7,6 +8,26 @@ const app = express();
 const prisma = new PrismaClient();
 
 app.use(express.json());
+
+// t1: endpoint uzywajacy natywnego sterownika z parametryzacja zapytania
+app.get('/api/products/pg/:id', async (req, res) => {
+  try {
+    // uzywamy $1 zamiast wklejac id - to chroni przed sql injection
+    const result = await query('SELECT * FROM "Product" WHERE id = $1', [parseInt(req.params.id)]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'nie znaleziono produktu' });
+    }
+    
+    res.json(result.rows[0]);
+  } catch (error) {
+    // t1: jednolity format bledow mapowanych z postgresa
+    res.status(error.status || 500).json({ 
+      error: error.message, 
+      details: error.details 
+    });
+  }
+});
 
 // t2: endpoint z dynamicznym where bez sklejania stringow
 app.get('/products', async (req, res) => {
