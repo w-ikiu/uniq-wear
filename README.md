@@ -1,3 +1,41 @@
+# UniqWear - Microservices E-commerce API
+
+Projekt zaliczeniowy realizujacy architekture mikroserwisow dla sklepu internetowego.
+Sklada sie z dwoch glownych uslug:
+- **catalog-service** (port 3001) - zarzadzanie produktami (baza PostgreSQL + MongoDB)
+- **checkout-service** (port 3002) - obsluga zamowien i stanow magazynowych (baza PostgreSQL)
+
+## Wymagania
+- Docker
+- Docker Compose
+
+## Instrukcja uruchomienia (Docker)
+
+1. Sklonuj repozytorium:
+   ```bash
+   git clone https://gitlab.com/ug_bazy_danych_2/25-26_project/project-chelminska-wiktoria-90d9.git
+   cd UniqWear
+   ```
+
+2. Skonfiguruj zmienne srodowiskowe (skopiuj pliki przykladowe):
+   - W folderze `catalog-service` zmien nazwe `.env.example` na `.env`
+   - W folderze `checkout-service` zmien nazwe `.env.example` na `.env`
+
+3. Uruchom wszystkie kontenery (bazy danych i mikroserwisy):
+   ```bash
+   docker compose up -d
+   ```
+
+4. Przygotuj baze danych dla katalogu (utworzenie tabel w PostgreSQL):
+   ```bash
+   docker exec catalog_service npx prisma db push
+   ```
+
+## Architektura i technologie
+- **Bazy danych:** PostgreSQL (dane relacyjne), MongoDB (opisy produktow)
+- **ORM:** Prisma (catalog-service), Sequelize (checkout-service)
+- **Konteneryzacja:** Docker, Docker Compose (z zaimplementowanymi healthcheckami)
+
 # Projekt
 
 <p class="editor-paragraph mb-2" dir="ltr"><span style="white-space: pre-wrap;">System serwerowy dla punktu zamówień (kiosk): katalog pozycji z wariantami i modyfikatorami, koszyk sesyjny, naliczanie cen, składanie zamówienia i potwierdzenie płatności (symulacja lub status). PostgreSQL: transakcyjna spójność stanów magazynowych, zamówień i pozycji. MongoDB: szkice konfiguracji koszyka, zdarzenia telemetryczne kroku składania (dla analityki i audytu UX po stronie serwera). Bez oceny interfejsu dotykowego — tylko API i modele danych.</span></p>
