@@ -1,0 +1,3 @@
+# ignorowane pliki
+node_modules
+.env
