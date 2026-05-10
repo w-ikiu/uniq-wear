@@ -18,13 +18,5 @@ async function connectToMongo() {
   return db;
 }
 
-// t5: zamkniecie przy sigint (kiedy wylaczasz serwer np. przez ctrl+c)
-process.on('SIGINT', async () => {
-  if (client) {
-    await client.close();
-    console.log('polaczenie natywne z mongodb zostalo zamkniete.');
-    process.exit(0);
-  }
-});
-
-module.exports = { connectToMongo };
+// t5: eksportujemy funkcje polaczenia i getter klienta
+module.exports = { connectToMongo, getClient: () => client };

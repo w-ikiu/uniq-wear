@@ -5,7 +5,7 @@ const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 
 const knex = require('./knex-client');
-const { connectToMongo } = require('./mongo-client');
+const { connectToMongo, getClient } = require('./mongo-client');
 
 const mongoose = require('mongoose');
 const Review = require('./models/Review');
@@ -149,7 +149,8 @@ app.post('/api/reviews', async (req, res) => {
       userId: req.body.userId,
       rating: req.body.rating,
       title: req.body.title,
-      body: req.body.body
+      body: req.body.body,
+      status: req.body.status
     });
     
     // save() automatycznie uruchamia walidatory i nasz pre-hook (cenzure)
@@ -165,7 +166,142 @@ mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('polaczono z mongodb przez mongoose'))
   .catch(err => console.error('blad polaczenia z mongodb:', err));
 
+// t7: agregacja pipeline
+app.get('/api/analytics/ratings', async (req, res) => {
+  try {
+    const pipeline = [
+      // 1. $match (wymog T7: filtrowanie uzywajace indeksu na pole 'status')
+      { $match: { status: 'approved' } },
+      
+      // 2. $group (wymog T7: grupowanie po produkcie i liczenie sredniej oraz ilosci)
+      { 
+        $group: {
+          _id: "$productId",
+          averageRating: { $avg: "$rating" },
+          reviewCount: { $sum: 1 }
+        }
+      },
+      
+      // 3. $lookup (wymog T7: zlaczenie z kolekcja productdetails - nazwa jest z malych liter z 's' na koncu przez mongoose)
+      {
+        $lookup: {
+          from: "productdetails", 
+          localField: "_id",
+          foreignField: "productId",
+          as: "details"
+        }
+      },
+      
+      // 4. dodatkowy stage 1: $unwind (rozpakowanie tablicy details utworzonej przez lookup)
+      { $unwind: { path: "$details", preserveNullAndEmptyArrays: true } },
+      
+      // 5. dodatkowy stage 2: $sort (sortowanie od najlepiej ocenianych)
+      { $sort: { averageRating: -1 } },
+      
+      // 6. $project (wymog T7: rzutowanie/formatowanie koncowego wyniku)
+      {
+        $project: {
+          _id: 0,
+          productId: "$_id",
+          averageRating: { $round: ["$averageRating", 2] },
+          reviewCount: 1,
+          description: "$details.long_description"
+        }
+      }
+    ];
+
+    // uruchomienie agregacji bezposrednio w bazie mongodb
+    const results = await Review.aggregate(pipeline);
+    res.json(results);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// t8c: architektura hybrydowa - zapis do pg i mongo z kompensacja
+app.post('/api/products/hybrid', async (req, res) => {
+  const { name, description, categoryId, price, sku, longDescription } = req.body;
+  let createdProductPg;
+
+  try {
+    // 1. zapis do postgresql (przez prisma)
+    createdProductPg = await prisma.product.create({
+      data: {
+        name,
+        description,
+        categoryId: parseInt(categoryId),
+        variants: {
+          create: { sku, price: parseFloat(price), stock: 0 }
+        }
+      }
+    });
+
+    // 2. zapis do mongodb (przez mongoose)
+    try {
+      const details = new ProductDetails({
+        productId: createdProductPg.id,
+        long_description: longDescription,
+        gallery: []
+      });
+      await details.save();
+      
+      res.status(201).json({
+        message: 'produkt utworzony w obu bazach',
+        pg: createdProductPg,
+        mongo: details
+      });
+
+    } catch (mongoError) {
+      // t8c: kompensacja - jesli mongo zawiedzie, usuwamy rekord z postgresa
+      console.error('blad mongo, uruchamiam kompensacje w postgres...');
+      await prisma.product.delete({ where: { id: createdProductPg.id } });
+      
+      throw new Error('blad zapisu detali produktu, operacja wycofana.');
+    }
+
+  } catch (error) {
+    res.status(error.message.includes('wycofana') ? 500 : 400).json({
+      error: 'blad tworzenia hybrydowego',
+      details: error.message
+    });
+  }
+});
+
 const PORT = process.env.CATALOG_PORT || 3001;
 app.listen(PORT, () => {
   console.log(`catalog service dziala na porcie ${PORT}`);
+});
+
+// timeout na zamykanie serwera (problemy z dzialaniem ctrl + c)
+process.on('SIGINT', async () => {
+  console.log('\nodebrano sygnal zamkniecia.');
+
+  // 1. ustawiamy bezpiecznik - po 2 sekundach bezwzglednie zabijamy proces
+  setTimeout(() => {
+    console.error('timeout - wymuszone zabicie procesu');
+    process.exit(0);
+  }, 2000);
+
+  // 2. probujemy kulturalnie zamknac polaczenia
+  try {
+    if (mongoose.connection.readyState !== 0) {
+      await mongoose.connection.close();
+      console.log('- mongoose zamkniety');
+    }
+    await prisma.$disconnect();
+    console.log('- prisma zamknieta');
+    
+    // natywny klient z t5
+    const nativeClient = getClient();
+    if (nativeClient) {
+      await nativeClient.close();
+      console.log('- natywne mongo zamkniete');
+    }
+    
+    console.log('wszystko zamkniete');
+    process.exit(0);
+  } catch (err) {
+    console.error('blad przy zamykaniu:', err);
+    process.exit(1);
+  }
 });

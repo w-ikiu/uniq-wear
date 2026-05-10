@@ -28,4 +28,8 @@ reviewSchema.pre('save', function() {
   }
 });
 
+// t7: indeksy pod optymalizacje wyszukiwania i agregacji
+reviewSchema.index({ status: 1, productId: 1 }); // zlozony indeks przyspieszajacy filtrowanie zatwierdzonych ocen
+reviewSchema.index({ createdAt: -1 }); // indeks pod ostatnie recenzje
+
 module.exports = mongoose.model('Review', reviewSchema);
