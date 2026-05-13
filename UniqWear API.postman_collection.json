@@ -11,6 +11,35 @@
       "name": "Catalog Service",
       "item": [
         {
+          "name": "Dodaj kategorie",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"name\": \"Sneakers\",\r\n  \"description\": \"Kategoria testowa\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:3001/api/categories",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3001",
+              "path": [
+                "api",
+                "categories"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
           "name": "Dodaj produkt hybrydowy (Postgres+Mongo)",
           "request": {
             "method": "POST",
@@ -37,6 +66,34 @@
                 "hybrid"
               ]
             }
+          },
+          "response": []
+        },
+        {
+          "name": "Pobierz wszystkie kategorie",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3001/api/categories",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3001",
+              "path": [
+                "api",
+                "categories"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Pobierz wszystkie produkty",
+          "request": {
+            "method": "GET",
+            "header": []
           },
           "response": []
         }
