@@ -1,20 +1,24 @@
-# obraz bazowy node.js w wersji alpine (bardzo lekki)
-FROM node:22-alpine
+# etap 1: builder (instalacja wszystkich zaleznosci)
+FROM node:22-alpine AS builder
 
-# katalog roboczy wewnatrz kontenera
 WORKDIR /app
 
-# kopiujemy pliki zaleznosci
 COPY package*.json ./
+RUN npm install
 
-# instalujemy tylko zaleznosci produkcyjne (pomijamy sequelize-cli)
-RUN npm install --omit=dev
-
-# kopiujemy cala reszte kodu
 COPY . .
 
-# wystawiamy port 3002 na zewnatrz kontenera
+# etap 2: produkcja (tylko to co niezbedne, lzejszy obraz)
+FROM node:22-alpine
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm install --omit=dev
+
+# kopiujemy gotowe pliki z etapu builder
+COPY --from=builder /app ./
+
 EXPOSE 3002
 
-# komenda uruchamiajaca aplikacje
 CMD ["node", "app.js"]
