@@ -1,15 +1,31 @@
 # UniqWear - Microservices E-commerce API
 
-Projekt zaliczeniowy realizujacy architekture mikroserwisow dla sklepu internetowego.
-Sklada sie z dwoch glownych uslug:
-- **catalog-service** (port 3001) - zarzadzanie produktami (baza PostgreSQL + MongoDB)
-- **checkout-service** (port 3002) - obsluga zamowien i stanow magazynowych (baza PostgreSQL)
+Backend dla sklepu internetowego zbudowany w architekturze mikroserwisów.
+
+## Serwisy
+
+| Serwis | Port | Opis |
+|--------|------|------|
+| gateway | 3000 | API Gateway — jeden punkt wejścia dla wszystkich żądań |
+| catalog-service | 3001 | Zarządzanie produktami, kategoriami, recenzjami |
+| checkout-service | 3002 | Koszyk, zamówienia, stany magazynowe |
+
+## Technologie
+
+- **PostgreSQL** — dane relacyjne (produkty, warianty, koszyki, zamówienia)
+- **MongoDB** — dane dokumentowe (opisy produktów, recenzje, szkice koszyków)
+- **Prisma** — ORM dla catalog-service (PostgreSQL)
+- **Sequelize** — ORM dla checkout-service (PostgreSQL)
+- **Knex** — query builder i migracje (catalog-service)
+- **Mongoose** — ODM dla MongoDB
+- **Docker / Docker Compose** — konteneryzacja
 
 ## Wymagania
+
 - Docker
 - Docker Compose
 
-## Instrukcja uruchomienia (Docker)
+## Instrukcja uruchomienia
 
 1. Sklonuj repozytorium:
    ```bash
@@ -17,24 +33,143 @@ Sklada sie z dwoch glownych uslug:
    cd UniqWear
    ```
 
-2. Skonfiguruj zmienne srodowiskowe (skopiuj pliki przykladowe):
-   - W folderze `catalog-service` zmien nazwe `.env.example` na `.env`
-   - W folderze `checkout-service` zmien nazwe `.env.example` na `.env`
+2. Skonfiguruj zmienne środowiskowe — w każdym folderze serwisu zmień nazwę `.env.example` na `.env`:
+   ```bash
+   cp catalog-service/.env.example catalog-service/.env
+   cp checkout-service/.env.example checkout-service/.env
+   cp gateway/.env.example gateway/.env
+   ```
 
-3. Uruchom wszystkie kontenery (bazy danych i mikroserwisy):
+3. Uruchom wszystkie kontenery:
    ```bash
    docker compose up -d
    ```
 
-4. Przygotuj baze danych dla katalogu (utworzenie tabel w PostgreSQL):
-   ```bash
-   docker exec catalog_service npx prisma db push
-   ```
+Migracje baz danych wykonują się automatycznie przy starcie kontenerów.
 
-## Architektura i technologie
-- **Bazy danych:** PostgreSQL (dane relacyjne), MongoDB (opisy produktow)
-- **ORM:** Prisma (catalog-service), Sequelize (checkout-service)
-- **Konteneryzacja:** Docker, Docker Compose (z zaimplementowanymi healthcheckami)
+## Zmienne środowiskowe
+
+### catalog-service
+```
+CATALOG_PORT=3001
+DATABASE_URL=postgresql://uniqwear_user:uniqwear_pass@postgres:5432/uniqwear_db?schema=public
+MONGO_URI=mongodb://mongo:27017/uniqwear_mongo
+```
+
+### checkout-service
+```
+CHECKOUT_PORT=3002
+DATABASE_URL=postgres://uniqwear_user:uniqwear_pass@postgres:5432/uniqwear_db
+MONGO_URI=mongodb://mongo:27017/uniqwear_mongo
+```
+
+### gateway
+```
+GATEWAY_PORT=3000
+CATALOG_URL=http://catalog_service:3001
+CHECKOUT_URL=http://checkout_service:3002
+```
+
+## Przepływ danych - co trafia do której bazy
+
+```
+PostgreSQL (dane twarde, relacyjne):
+├── Category        — kategorie produktów
+├── Product         — produkty z licznikiem recenzji
+├── Variant         — warianty (SKU, cena, stan magazynowy)
+├── Cart            — koszyki
+├── CartLine        — pozycje koszyka (snapshot ceny)
+├── Order           — zamówienia
+└── OrderLine       — pozycje zamówienia (snapshot ceny i SKU)
+
+MongoDB (dane miękkie, dokumentowe):
+├── ProductDetails  — długi opis, specyfikacje, galeria zdjęć
+├── Review          — recenzje z historią moderacji
+└── CartDraft       — szkic koszyka z historią zdarzeń (dodano, usunięto)
+```
+
+### Kiedy dane trafiają do obu baz jednocześnie
+
+**Tworzenie produktu** (`POST /catalog/api/products/hybrid`):
+```
+1. Zapisz produkt do PostgreSQL (Prisma)
+2. Zapisz szczegóły do MongoDB (Mongoose)
+3. Jeśli MongoDB zawiedzie → usuń rekord z PostgreSQL (kompensacja)
+```
+
+**Zatwierdzenie recenzji** (`PATCH /catalog/api/reviews/:id/approve`):
+```
+1. Zmień status recenzji na 'approved' w MongoDB
+2. Zinkrementuj reviewCount w tabeli Product w PostgreSQL
+3. Jeśli PostgreSQL zawiedzie → cofnij zmianę statusu w MongoDB (kompensacja)
+```
+
+**Dodanie do koszyka** (`POST /checkout/api/cart/:id/items`):
+```
+1. Sprawdź stan magazynowy w PostgreSQL (blokada FOR UPDATE)
+2. Zapisz CartLine w PostgreSQL
+3. Zaktualizuj CartDraft w MongoDB (przez osobny endpoint)
+```
+
+## Endpointy API
+
+Wszystkie żądania przechodzą przez Gateway na porcie 3000.
+
+### Katalog (`/catalog/...`)
+
+| Metoda | Endpoint | Opis |
+|--------|----------|------|
+| GET | /catalog/products | Lista produktów z filtrem (category, minPrice) |
+| GET | /catalog/products/:id | Szczegóły produktu z wariantami (Prisma) |
+| GET | /catalog/api/products/pg/:id | Szczegóły produktu (natywny sterownik pg) |
+| GET | /catalog/api/products/details | Szczegóły wielu produktów z Mongo ($in) |
+| GET | /catalog/api/products/details/search | Wyszukiwanie pełnotekstowe ($text, $gte) |
+| POST | /catalog/api/products/hybrid | Utwórz produkt w PG + Mongo z kompensacją |
+| GET | /catalog/api/categories | Lista kategorii |
+| POST | /catalog/api/categories | Dodaj kategorię |
+| POST | /catalog/api/reviews | Dodaj recenzję |
+| PATCH | /catalog/api/reviews/:id/approve | Zatwierdź recenzję (aktualizuje PG + Mongo) |
+| GET | /catalog/api/analytics/ratings | Agregacja średnich ocen produktów |
+| GET | /catalog/stats/inventory | Statystyki magazynowe ($queryRaw) |
+| POST | /catalog/api/cart-draft | Utwórz/zaktualizuj szkic koszyka w Mongo |
+| GET | /catalog/api/cart-draft/:cartId | Pobierz szkic koszyka z populate() |
+
+### Koszyk i zamówienia (`/checkout/...`)
+
+| Metoda | Endpoint | Opis |
+|--------|----------|------|
+| POST | /checkout/api/cart | Utwórz koszyk |
+| GET | /checkout/api/cart/:id | Pobierz koszyk z pozycjami |
+| POST | /checkout/api/cart/:id/items | Dodaj produkt do koszyka (walidacja stanu) |
+| DELETE | /checkout/api/cart/:id/items/:sku | Usuń produkt z koszyka |
+| POST | /checkout/checkout | Złóż zamówienie (blokada oversell) |
+| GET | /checkout/orders | Historia zamówień |
+| POST | /checkout/orders/:id/cancel | Anuluj zamówienie (przywraca stan) |
+
+## Reguły biznesowe
+
+- **Snapshot ceny** - zmiana cennika nie wpływa na już złożone zamówienia ani pozycje koszyka
+- **Blokada oversell** - checkout zwraca 409 gdy brak wystarczającego stanu magazynowego
+- **Anulowanie zamówienia** - przywraca stan magazynowy wszystkich pozycji
+- **Polityka dla otwartych koszyków** - jeśli produkt zniknie z menu, pozycje pozostają w koszyku aż do ręcznego usunięcia lub zamknięcia koszyka
+- **Unikalność SKU** - próba dodania duplikatu zwraca 409
+
+## Bezpieczeństwo
+
+### Zaimplementowane zabezpieczenia
+
+- **Zapytania parametryzowane** - wszystkie zapytania SQL używają placeholderów (`$1`, `$2` w pg, `:param` w Sequelize) zamiast sklejania stringów. Chroni przed SQL injection.
+- **Brak stack trace w odpowiedziach** - błędy zwracają tylko `{ error, code, details }` bez wewnętrznych szczegółów implementacji
+- **Walidacja wejścia** - modele Sequelize i Mongoose walidują dane przed zapisem (typy, zakresy, wymagane pola)
+- **Jednolity format błędów** - każdy błąd ma ten sam format `{ error, code, details }` co ułatwia obsługę po stronie klienta
+
+### Potencjalne zagrożenia i ograniczenia
+
+- **Brak autoryzacji i autentykacji** - API jest w pełni otwarte. W produkcji należy dodać JWT lub OAuth w warstwie Gateway
+- **Brak rate limitingu** - Gateway nie ogranicza liczby żądań. W produkcji należy dodać np. `express-rate-limit`
+- **Brak HTTPS** - komunikacja odbywa się po HTTP. W produkcji należy skonfigurować TLS/SSL
+- **Zmienne środowiskowe** - hasła do baz danych są w plikach `.env` które są wykluczone z repozytorium przez `.gitignore`. Nigdy nie commituj pliku `.env`
+
 
 # Projekt
 
