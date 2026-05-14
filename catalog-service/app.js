@@ -143,6 +143,35 @@ app.get('/api/products/details/search', async (req, res) => {
   }
 });
 
+// t5: trzeci operator mongodb - $in (pobieranie szczegolów wielu produktów naraz)
+app.get('/api/products/details', async (req, res) => {
+  try {
+    const db = await connectToMongo();
+    
+    // ids przychodzi jako ?ids=1,2,3
+    const ids = req.query.ids
+      ? req.query.ids.split(',').map(Number)
+      : [];
+
+    if (ids.length === 0) {
+      return res.status(400).json({ 
+        error: 'brak parametru ids', 
+        code: 400, 
+        details: 'podaj ids jako ?ids=1,2,3' 
+      });
+    }
+
+    // t5: operator $in - znajdz dokumenty gdzie productId jest w podanej liscie
+    const details = await db.collection('productdetails').find({
+      productId: { $in: ids }
+    }).toArray();
+
+    res.json(details);
+  } catch (error) {
+    res.status(500).json({ error: error.message, code: 500, details: null });
+  }
+});
+
 // t6: endpoint do dodawania recenzji i testowania hookow (mongoose)
 app.post('/api/reviews', async (req, res) => {
   try {
