@@ -23,4 +23,6 @@ COPY --from=builder /app ./
 
 EXPOSE 3001
 
-CMD ["node", "app.js"]
+COPY start.sh .
+RUN chmod +x start.sh
+CMD ["sh", "start.sh"]
