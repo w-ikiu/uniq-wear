@@ -74,6 +74,91 @@ app.post('/checkout', async (req, res) => {
   }
 });
 
+// endpoint do pobierania historii zamowien (wymog specyficzny)
+// oraz eager loading z uzyciem include (wymog t3 - sequelize)
+app.get('/orders', async (req, res) => {
+  try {
+    // pobieramy wszystkie zamowienia
+    const orders = await Order.findAll({
+      // eager loading: od razu doczepiamy pozycje z koszyka do zamowienia
+      include: [
+        {
+          model: OrderLine
+        }
+      ],
+      order: [['createdAt', 'DESC']] // sortujemy od najnowszych
+    });
+    
+    res.json(orders);
+  } catch (error) {
+    res.status(500).json({ 
+      error: 'blad pobierania historii zamowien',
+      code: 500,
+      details: error.message 
+    });
+  }
+});
+
+// endpoint: order history (business requirement) & eager loading (t3)
+app.get('/orders/history', async (req, res) => {
+  try {
+    const orders = await Order.findAll({
+      // include order lines automatically - this is eager loading for t3
+      include: [{ model: OrderLine }],
+      order: [['createdAt', 'DESC']]
+    });
+    res.json(orders);
+  } catch (error) {
+    res.status(500).json({ 
+      error: 'order history error',
+      code: 500,
+      details: error.message 
+    });
+  }
+});
+
+// endpoint: cancel order and restore stock (business requirement)
+app.post('/orders/:id/cancel', async (req, res) => {
+  try {
+    // managed transaction for safety
+    await sequelize.transaction(async (t) => {
+      // fetch order with items
+      const order = await Order.findByPk(req.params.id, {
+        include: [{ model: OrderLine }],
+        transaction: t
+      });
+
+      if (!order) {
+        throw Object.assign(new Error('order not found'), { status: 404 });
+      }
+      if (order.status === 'cancelled') {
+        throw Object.assign(new Error('order already cancelled'), { status: 400 });
+      }
+
+      // loop through order lines and restore stock in catalog
+      for (const line of order.OrderLines) {
+        await sequelize.query(
+          `UPDATE "Variant" SET stock = stock + :quantity WHERE sku = :sku`,
+          { replacements: { quantity: line.quantity, sku: line.sku }, transaction: t }
+        );
+      }
+
+      // update order status
+      order.status = 'cancelled';
+      await order.save({ transaction: t });
+    });
+
+    res.json({ message: 'order cancelled and stock successfully restored' });
+  } catch (error) {
+    const status = error.status || 500;
+    res.status(status).json({ 
+      error: 'cancel failed',
+      code: status,
+      details: error.message 
+    });
+  }
+});
+
 const PORT = process.env.CHECKOUT_PORT || 3002;
 app.listen(PORT, () => {
   console.log(`checkout service dziala na porcie ${PORT}`);

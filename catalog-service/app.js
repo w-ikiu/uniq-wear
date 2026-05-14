@@ -23,14 +23,16 @@ app.get('/api/products/pg/:id', async (req, res) => {
     const result = await query('SELECT * FROM "Product" WHERE id = $1', [parseInt(req.params.id)]);
     
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'nie znaleziono produktu' });
+      return res.status(404).json({ error: 'nie znaleziono produktu', code: 404, details: null });
     }
     
     res.json(result.rows[0]);
   } catch (error) {
     // t1: jednolity format bledow mapowanych z postgresa
-    res.status(error.status || 500).json({ 
-      error: error.message, 
+    const status = error.status || 500;
+    res.status(status).json({ 
+      error: error.message,
+      code: status,
       details: error.details 
     });
   }
@@ -63,7 +65,7 @@ app.get('/products', async (req, res) => {
     const products = await query;
     res.json(products);
   } catch (error) {
-    res.status(500).json({ error: 'blad serwera', details: error.message });
+    res.status(500).json({ error: 'blad serwera', code: 500, details: error.message });
   }
 });
 
@@ -78,10 +80,10 @@ app.get('/products/:id', async (req, res) => {
       }
     });
 
-    if (!product) return res.status(404).json({ error: 'nie znaleziono produktu' });
+    return res.status(404).json({ error: 'nie znaleziono produktu', code: 404, details: null });
     res.json(product);
   } catch (error) {
-    res.status(500).json({ error: 'blad prismy', details: error.message });
+    res.status(500).json({ error: 'blad prismy', code: 500, details: error.message });
   }
 });
 
@@ -109,7 +111,7 @@ app.get('/stats/inventory', async (req, res) => {
 
     res.json(formattedStats);
   } catch (error) {
-    res.status(500).json({ error: 'blad statystyk', details: error.message });
+    res.status(500).json({ error: 'blad statystyk', code: 500, details: error.message });
   }
 });
 
@@ -137,7 +139,7 @@ app.get('/api/products/details/search', async (req, res) => {
     
     res.json(details);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error.message, code: 500, details: null });
   }
 });
 
@@ -157,7 +159,7 @@ app.post('/api/reviews', async (req, res) => {
     await review.save(); 
     res.status(201).json(review);
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(400).json({ error: error.message, code: 400, details: null });
   }
 });
 
@@ -214,7 +216,7 @@ app.get('/api/analytics/ratings', async (req, res) => {
     const results = await Review.aggregate(pipeline);
     res.json(results);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error.message, code: 500, details: null });
   }
 });
 
@@ -260,8 +262,10 @@ app.post('/api/products/hybrid', async (req, res) => {
     }
 
   } catch (error) {
-    res.status(error.message.includes('wycofana') ? 500 : 400).json({
+    const status = error.message.includes('wycofana') ? 500 : 400;
+    res.status(status).json({
       error: 'blad tworzenia hybrydowego',
+      code: status,
       details: error.message
     });
   }
