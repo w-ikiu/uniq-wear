@@ -10,6 +10,7 @@ const { connectToMongo, getClient } = require('./mongo-client');
 const mongoose = require('mongoose');
 const Review = require('./models/Review');
 const ProductDetails = require('./models/ProductDetails');
+const CartDraft = require('./models/CartDraft');
 
 const app = express();
 const prisma = new PrismaClient();
@@ -80,7 +81,12 @@ app.get('/products/:id', async (req, res) => {
       }
     });
 
-    return res.status(404).json({ error: 'nie znaleziono produktu', code: 404, details: null });
+    // najpierw sprawdz czy produkt istnieje
+    if (!product) {
+      return res.status(404).json({ error: 'nie znaleziono produktu', code: 404, details: null });
+    }
+
+    // jesli istnieje - zwroc go
     res.json(product);
   } catch (error) {
     res.status(500).json({ error: 'blad prismy', code: 500, details: error.message });
@@ -246,6 +252,76 @@ app.get('/api/analytics/ratings', async (req, res) => {
     res.json(results);
   } catch (error) {
     res.status(500).json({ error: error.message, code: 500, details: null });
+  }
+});
+
+// t6: tworzenie szkicu koszyka w mongodb
+// lacznik miedzy koszykiem w postgresql (cartId) a szczegolami produktow w mongodb
+app.post('/api/cart-draft', async (req, res) => {
+  try {
+    const { cartId, sessionId, productDetailsId, sku, quantity } = req.body;
+
+    // znajdz istniejacy szkic lub stworz nowy
+    let draft = await CartDraft.findOne({ cartId });
+
+    if (!draft) {
+      draft = new CartDraft({ cartId, sessionId, items: [], events: [] });
+    }
+
+    // sprawdz czy ten sku jest juz w szkicu
+    const existingItem = draft.items.find(item => item.sku === sku);
+
+    if (existingItem) {
+      existingItem.quantity += quantity;
+    } else {
+      draft.items.push({
+        productDetails: productDetailsId, // objectid z mongodb
+        sku,
+        quantity
+      });
+    }
+
+    // dodaj zdarzenie do historii
+    draft.events.push({
+      type: 'item_added',
+      sku
+    });
+
+    await draft.save();
+    res.status(201).json(draft);
+  } catch (error) {
+    res.status(400).json({
+      error: 'blad tworzenia szkicu koszyka',
+      code: 400,
+      details: error.message
+    });
+  }
+});
+
+// t6: populate() - pobierz szkic koszyka z pelnym dokumentem szczegolów produktu
+// populate zastepuje samo id produktu pelnym dokumentem z kolekcji ProductDetails
+app.get('/api/cart-draft/:cartId', async (req, res) => {
+  try {
+    const draft = await CartDraft.findOne({
+      cartId: parseInt(req.params.cartId)
+    // populate: zamiast samego ObjectId dociaga caly dokument ProductDetails
+    }).populate('items.productDetails');
+
+    if (!draft) {
+      return res.status(404).json({
+        error: 'nie znaleziono szkicu koszyka',
+        code: 404,
+        details: null
+      });
+    }
+
+    res.json(draft);
+  } catch (error) {
+    res.status(500).json({
+      error: 'blad pobierania szkicu koszyka',
+      code: 500,
+      details: null
+    });
   }
 });
 
