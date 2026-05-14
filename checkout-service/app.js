@@ -1,28 +1,26 @@
 require('dotenv').config();
 const express = require('express');
-const { sequelize, Order, OrderLine } = require('./models');
+const { sequelize, Order, OrderLine, Cart, CartLine } = require('./models');
 const connectMongo = require('./config/mongo');
 
 const app = express();
 app.use(express.json());
 
-// polaczenie z mongodb
+// polaczenie z mongodb (mongoose) przy starcie serwisu
 connectMongo();
 
-// endpoint obslugujacy koszyk i skladanie zamowienia
+// wymog specyficzny: checkout z blokada oversell
+// t3: transakcja zarzadzana (sequelize.transaction)
+// t3: blokada FOR UPDATE zapobiega wyscigom przy rownoczesnych zamowieniach
+// regula biznesowa: snapshot ceny w order_lines (zmiana cennika nie wplywa na zlezone zamowienia)
 app.post('/checkout', async (req, res) => {
   const { items } = req.body; 
-  // oczekujemy formatu: [{ sku: 'AM1-BLU-42', quantity: 1 }]
-
   try {
-    // wymog t3: transakcja zarzadzana (managed transaction)
     const result = await sequelize.transaction(async (t) => {
       let totalAmount = 0;
       const orderLinesData = [];
 
       for (const item of items) {
-        // 1. sprawdzamy stan w tabeli wariantow (zarzadzanej przez catalog-service)
-        // klauzula 'for update' blokuje ten wiersz w bazie, dopki nie skonczymy! zapobiega to wyscigom.
         const [variants] = await sequelize.query(
           `SELECT id, price, stock FROM "Variant" WHERE sku = :sku FOR UPDATE`,
           { replacements: { sku: item.sku }, transaction: t }
@@ -31,31 +29,28 @@ app.post('/checkout', async (req, res) => {
         const variant = variants[0];
         if (!variant) throw Object.assign(new Error(`wariant ${item.sku} nie istnieje`), { status: 404 });
         
-        // blokada oversell (wymog: kod 409)
+        // blokada oversell - zwraca 409 gdy brak stanu
         if (variant.stock < item.quantity) {
           throw Object.assign(new Error(`brak wystarczajacej ilosci dla ${item.sku}`), { status: 409 });
         }
 
-        // 2. aktualizacja stanu magazynowego (odjecie kupionej ilosci)
         await sequelize.query(
           `UPDATE "Variant" SET stock = stock - :quantity WHERE sku = :sku`,
           { replacements: { quantity: item.quantity, sku: item.sku }, transaction: t }
         );
 
-        // 3. logowanie ceny jako snapshot w orderline
         const linePrice = parseFloat(variant.price);
         totalAmount += linePrice * item.quantity;
         orderLinesData.push({
           sku: item.sku,
-          price: linePrice,
+          price: linePrice, // snapshot ceny
           quantity: item.quantity
         });
       }
 
-      // 4. utworzenie zamowienia (wywola tez hook z walidacja z wymogu t3)
+      // t3: hook beforeCreate sprawdza czy kwota nie jest ujemna
       const order = await Order.create({ totalAmount, status: 'paid' }, { transaction: t });
 
-      // 5. doczepienie id zamowienia do pozycji i masowy zapis (order_lines ze snapshotem)
       const linesWithOrderId = orderLinesData.map(line => ({ ...line, orderId: order.id }));
       await OrderLine.bulkCreate(linesWithOrderId, { transaction: t });
 
@@ -64,7 +59,7 @@ app.post('/checkout', async (req, res) => {
 
     res.status(201).json({ message: 'zamowienie zlozone', order: result });
   } catch (error) {
-    // jednolity format bledow (wymog t8c)
+    // t8c: jednolity format bledow
     const status = error.status || 500;
     res.status(status).json({ 
       error: 'blad checkoutu', 
@@ -74,21 +69,14 @@ app.post('/checkout', async (req, res) => {
   }
 });
 
-// endpoint do pobierania historii zamowien (wymog specyficzny)
-// oraz eager loading z uzyciem include (wymog t3 - sequelize)
+// wymog specyficzny: historia zamowien uzytkownika
+// t3: eager loading - OrderLine dolaczony do Order przez include
 app.get('/orders', async (req, res) => {
   try {
-    // pobieramy wszystkie zamowienia
     const orders = await Order.findAll({
-      // eager loading: od razu doczepiamy pozycje z koszyka do zamowienia
-      include: [
-        {
-          model: OrderLine
-        }
-      ],
-      order: [['createdAt', 'DESC']] // sortujemy od najnowszych
+      include: [{ model: OrderLine, as: 'lines' }],
+      order: [['createdAt', 'DESC']]
     });
-    
     res.json(orders);
   } catch (error) {
     res.status(500).json({ 
@@ -99,61 +87,181 @@ app.get('/orders', async (req, res) => {
   }
 });
 
-// endpoint: order history (business requirement) & eager loading (t3)
-app.get('/orders/history', async (req, res) => {
-  try {
-    const orders = await Order.findAll({
-      // include order lines automatically - this is eager loading for t3
-      include: [{ model: OrderLine }],
-      order: [['createdAt', 'DESC']]
-    });
-    res.json(orders);
-  } catch (error) {
-    res.status(500).json({ 
-      error: 'order history error',
-      code: 500,
-      details: error.message 
-    });
-  }
-});
-
-// endpoint: cancel order and restore stock (business requirement)
+// wymog specyficzny: anulowanie zamowienia
+// t3: transakcja zarzadzana
+// regula biznesowa: anulowanie przywraca stan magazynowy (jawnie opisane)
 app.post('/orders/:id/cancel', async (req, res) => {
   try {
-    // managed transaction for safety
     await sequelize.transaction(async (t) => {
-      // fetch order with items
       const order = await Order.findByPk(req.params.id, {
-        include: [{ model: OrderLine }],
+        include: [{ model: OrderLine, as: 'lines' }],
         transaction: t
       });
 
       if (!order) {
-        throw Object.assign(new Error('order not found'), { status: 404 });
+        throw Object.assign(new Error('nie znaleziono zamowienia'), { status: 404 });
       }
       if (order.status === 'cancelled') {
-        throw Object.assign(new Error('order already cancelled'), { status: 400 });
+        throw Object.assign(new Error('zamowienie jest juz anulowane'), { status: 400 });
       }
 
-      // loop through order lines and restore stock in catalog
-      for (const line of order.OrderLines) {
+      // przywracamy stan magazynowy dla kazdej pozycji zamowienia
+      for (const line of order.lines) {
         await sequelize.query(
           `UPDATE "Variant" SET stock = stock + :quantity WHERE sku = :sku`,
           { replacements: { quantity: line.quantity, sku: line.sku }, transaction: t }
         );
       }
 
-      // update order status
       order.status = 'cancelled';
       await order.save({ transaction: t });
     });
 
-    res.json({ message: 'order cancelled and stock successfully restored' });
+    res.json({ message: 'zamowienie anulowane, stan magazynowy przywrocony' });
   } catch (error) {
     const status = error.status || 500;
     res.status(status).json({ 
-      error: 'cancel failed',
+      error: 'blad anulowania zamowienia',
       code: status,
+      details: error.message 
+    });
+  }
+});
+
+// wymog specyficzny: utworzenie koszyka w postgresql
+// t3: model Cart z walidacja statusu
+app.post('/api/cart', async (req, res) => {
+  try {
+    const { sessionId } = req.body;
+    const cart = await Cart.create({ sessionId, status: 'open' });
+    res.status(201).json(cart);
+  } catch (error) {
+    res.status(500).json({ 
+      error: 'blad tworzenia koszyka', 
+      code: 500, 
+      details: error.message 
+    });
+  }
+});
+
+// wymog specyficzny: dodawanie do koszyka z walidacja stanu magazynowego
+// t3: transakcja zarzadzana, blokada FOR UPDATE
+// regula biznesowa: konflikt koszyka przy wyczerpanym stanie (409)
+app.post('/api/cart/:id/items', async (req, res) => {
+  const { sku, quantity } = req.body;
+  try {
+    await sequelize.transaction(async (t) => {
+      const cart = await Cart.findByPk(req.params.id, { transaction: t });
+
+      if (!cart) {
+        throw Object.assign(new Error('nie znaleziono koszyka'), { status: 404 });
+      }
+      if (cart.status === 'closed') {
+        throw Object.assign(new Error('koszyk jest zamkniety'), { status: 400 });
+      }
+
+      const [variants] = await sequelize.query(
+        `SELECT id, price, stock FROM "Variant" WHERE sku = :sku FOR UPDATE`,
+        { replacements: { sku }, transaction: t }
+      );
+
+      const variant = variants[0];
+      if (!variant) {
+        throw Object.assign(new Error(`wariant ${sku} nie istnieje`), { status: 404 });
+      }
+
+      // regula biznesowa: blokada przy wyczerpanym stanie
+      if (variant.stock < quantity) {
+        throw Object.assign(
+          new Error(`niewystarczajacy stan dla ${sku}: dostepne ${variant.stock}`), 
+          { status: 409 }
+        );
+      }
+
+      const existingLine = await CartLine.findOne({ 
+        where: { cartId: cart.id, sku },
+        transaction: t
+      });
+
+      if (existingLine) {
+        existingLine.quantity += quantity;
+        await existingLine.save({ transaction: t });
+      } else {
+        // snapshot ceny w momencie dodania do koszyka
+        await CartLine.create({
+          cartId: cart.id,
+          sku,
+          price: parseFloat(variant.price),
+          quantity
+        }, { transaction: t });
+      }
+    });
+
+    const updatedCart = await Cart.findByPk(req.params.id, {
+      include: [{ model: CartLine, as: 'lines' }]
+    });
+
+    res.status(201).json(updatedCart);
+  } catch (error) {
+    const status = error.status || 500;
+    res.status(status).json({ 
+      error: 'blad dodawania do koszyka', 
+      code: status, 
+      details: error.message 
+    });
+  }
+});
+
+// wymog specyficzny: usuwanie pozycji z koszyka
+// regula biznesowa: pozycje mozna usunac z otwartego koszyka w kazdej chwili
+// polityka dla otwartych koszykow: jesli produkt zniknie z menu, pozycje pozostaja
+// w koszyku az do recznego usuniecia lub zamkniecia koszyka
+app.delete('/api/cart/:id/items/:sku', async (req, res) => {
+  try {
+    const line = await CartLine.findOne({ 
+      where: { cartId: req.params.id, sku: req.params.sku } 
+    });
+
+    if (!line) {
+      return res.status(404).json({ 
+        error: 'nie znaleziono pozycji w koszyku', 
+        code: 404, 
+        details: null 
+      });
+    }
+
+    await line.destroy();
+    res.json({ message: 'pozycja usunieta z koszyka' });
+  } catch (error) {
+    res.status(500).json({ 
+      error: 'blad usuwania z koszyka', 
+      code: 500, 
+      details: error.message 
+    });
+  }
+});
+
+// wymog specyficzny: pobieranie koszyka z pozycjami
+// t3: eager loading - CartLine dolaczony do Cart przez include
+app.get('/api/cart/:id', async (req, res) => {
+  try {
+    const cart = await Cart.findByPk(req.params.id, {
+      include: [{ model: CartLine, as: 'lines' }]
+    });
+
+    if (!cart) {
+      return res.status(404).json({ 
+        error: 'nie znaleziono koszyka', 
+        code: 404, 
+        details: null 
+      });
+    }
+
+    res.json(cart);
+  } catch (error) {
+    res.status(500).json({ 
+      error: 'blad pobierania koszyka', 
+      code: 500, 
       details: error.message 
     });
   }
