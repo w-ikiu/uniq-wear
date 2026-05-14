@@ -376,6 +376,71 @@ app.post('/api/products/hybrid', async (req, res) => {
   }
 });
 
+// hybryda specyficzna: zatwierdzenie recenzji
+// 1. aktualizacja statusu w mongodb (mongoose)
+// 2. inkrementacja licznika w postgresql (prisma)
+// t8c: kompensacja jesli drugi zapis zawiedzie
+app.patch('/api/reviews/:id/approve', async (req, res) => {
+  let reviewBeforeUpdate;
+
+  try {
+    // 1. znajdz recenzje w mongodb
+    const review = await Review.findById(req.params.id);
+
+    if (!review) {
+      return res.status(404).json({
+        error: 'nie znaleziono recenzji',
+        code: 404,
+        details: null
+      });
+    }
+
+    if (review.status === 'approved') {
+      return res.status(400).json({
+        error: 'recenzja jest juz zatwierdzona',
+        code: 400,
+        details: null
+      });
+    }
+
+    // zapisz poprzedni status na wypadek kompensacji
+    reviewBeforeUpdate = review.status;
+
+    // 2. zaktualizuj status w mongodb
+    review.status = 'approved';
+    await review.save();
+
+    // 3. zinkrementuj licznik w postgresql
+    try {
+      await prisma.product.update({
+        where: { id: review.productId },
+        data: { reviewCount: { increment: 1 } }
+      });
+
+      res.json({
+        message: 'recenzja zatwierdzona, licznik zaktualizowany',
+        review
+      });
+
+    } catch (pgError) {
+      // t8c: kompensacja - jesli pg zawiedzie, cofamy zmiane w mongodb
+      console.error('blad pg, uruchamiam kompensacje w mongodb...');
+      review.status = reviewBeforeUpdate;
+      await review.save();
+
+      throw new Error('blad aktualizacji licznika, operacja wycofana.');
+    }
+
+  } catch (error) {
+    const status = error.message.includes('wycofana') ? 500 : 400;
+    res.status(status).json({
+      error: 'blad zatwierdzania recenzji',
+      code: status,
+      details: error.message
+    });
+  }
+});
+
 const PORT = process.env.CATALOG_PORT || 3001;
 app.listen(PORT, () => {
   console.log(`catalog service dziala na porcie ${PORT}`);
