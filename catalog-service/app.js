@@ -441,6 +441,29 @@ app.patch('/api/reviews/:id/approve', async (req, res) => {
   }
 });
 
+// endpoint do zarzadzania kategoriami (wymagany do tworzenia produktow)
+app.get('/api/categories', async (req, res) => {
+  try {
+    const categories = await prisma.category.findMany();
+    res.json(categories);
+  } catch (error) {
+    res.status(500).json({ error: 'blad pobierania kategorii', code: 500, details: error.message });
+  }
+});
+
+app.post('/api/categories', async (req, res) => {
+  try {
+    const { name, description } = req.body;
+    const category = await prisma.category.create({
+      data: { name }
+    });
+    res.status(201).json(category);
+  } catch (error) {
+    const status = error.status || 500;
+    res.status(status).json({ error: 'blad tworzenia kategorii', code: status, details: error.message });
+  }
+});
+
 const PORT = process.env.CATALOG_PORT || 3001;
 app.listen(PORT, () => {
   console.log(`catalog service dziala na porcie ${PORT}`);

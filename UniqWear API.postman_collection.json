@@ -1,101 +1,402 @@
 {
   "info": {
-    "_postman_id": "60a90df9-47a2-46e8-8967-76d26aaeb96f",
+    "_postman_id": "a10803c5-e22d-409b-b8df-92aaf2c7d76b",
     "name": "UniqWear API",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_exporter_id": "52699875",
-    "_collection_link": "https://go.postman.co/collection/52699875-60a90df9-47a2-46e8-8967-76d26aaeb96f?source=collection_link"
+    "_collection_link": "https://go.postman.co/collection/52699875-a10803c5-e22d-409b-b8df-92aaf2c7d76b?source=collection_link"
   },
   "item": [
     {
       "name": "Catalog Service",
       "item": [
         {
-          "name": "Dodaj kategorie",
-          "request": {
-            "method": "POST",
-            "header": [],
-            "body": {
-              "mode": "raw",
-              "raw": "{\r\n  \"name\": \"Sneakers\",\r\n  \"description\": \"Kategoria testowa\"\r\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
+          "name": "Produkty",
+          "item": [
+            {
+              "name": "Lista produktow z filtrem",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "http://localhost:3000/catalog/products?category=sneakers&minPrice=100",
+                  "protocol": "http",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "3000",
+                  "path": [
+                    "catalog",
+                    "products"
+                  ],
+                  "query": [
+                    {
+                      "key": "category",
+                      "value": "sneakers"
+                    },
+                    {
+                      "key": "minPrice",
+                      "value": "100"
+                    }
+                  ]
+                },
+                "description": "T2: dynamiczny where przez Knex (filtr po kategorii i cenie)"
+              },
+              "response": []
             },
-            "url": {
-              "raw": "http://localhost:3001/api/categories",
-              "protocol": "http",
-              "host": [
-                "localhost"
-              ],
-              "port": "3001",
-              "path": [
-                "api",
-                "categories"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Dodaj produkt hybrydowy (Postgres+Mongo)",
-          "request": {
-            "method": "POST",
-            "header": [],
-            "body": {
-              "mode": "raw",
-              "raw": "{\r\n  \"name\": \"Docker Sneaker\",\r\n  \"description\": \"Testowy but\",\r\n  \"categoryId\": 1,\r\n  \"price\": 499,\r\n  \"sku\": \"DOC-001\",\r\n  \"longDescription\": \"Ten opis wedruje do MongoDB\"\r\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
+            {
+              "name": "Szczegoly produktu (Prisma)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "http://localhost:3000/catalog/products/1",
+                  "protocol": "http",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "3000",
+                  "path": [
+                    "catalog",
+                    "products",
+                    "1"
+                  ]
+                },
+                "description": "T4: CRUD przez PrismaClient z eager loading (category + variants)"
+              },
+              "response": []
             },
-            "url": {
-              "raw": "http://localhost:3001/api/products/hybrid",
-              "protocol": "http",
-              "host": [
-                "localhost"
-              ],
-              "port": "3001",
-              "path": [
-                "api",
-                "products",
-                "hybrid"
-              ]
+            {
+              "name": "Szczegoly produktu (natywny pg)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "http://localhost:3000/catalog/api/products/pg/1",
+                  "protocol": "http",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "3000",
+                  "path": [
+                    "catalog",
+                    "api",
+                    "products",
+                    "pg",
+                    "1"
+                  ]
+                },
+                "description": "T1: zapytanie parametryzowane ($1) przez natywny sterownik pg"
+              },
+              "response": []
+            },
+            {
+              "name": "Statystyki magazynowe ($queryRaw)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "http://localhost:3000/catalog/stats/inventory?minStock=0",
+                  "protocol": "http",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "3000",
+                  "path": [
+                    "catalog",
+                    "stats",
+                    "inventory"
+                  ],
+                  "query": [
+                    {
+                      "key": "minStock",
+                      "value": "0"
+                    }
+                  ]
+                },
+                "description": "T4: $queryRaw (tagged template literal) w Prisma"
+              },
+              "response": []
+            },
+            {
+              "name": "Dodaj produkt hybrydowy (PG + Mongo)",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Air Max 1\",\n  \"description\": \"Klasyczny but na kazda okazje\",\n  \"categoryId\": 1,\n  \"price\": 699.99,\n  \"sku\": \"AM1-BLU-42\",\n  \"longDescription\": \"Ten opis wedruje do MongoDB. Klasyczny model z lat 80-tych.\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "http://localhost:3000/catalog/api/products/hybrid",
+                  "protocol": "http",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "3000",
+                  "path": [
+                    "catalog",
+                    "api",
+                    "products",
+                    "hybrid"
+                  ]
+                },
+                "description": "T8c: zapis do PG (Prisma) + Mongo (Mongoose) z kompensacja przy bledzie"
+              },
+              "response": []
+            },
+            {
+              "name": "Dodaj kategorie",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"name\": \"sneakers\",\r\n  \"description\": \"Kategoria testowa\"\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "http://localhost:3000/catalog/api/categories",
+                  "protocol": "http",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "3000",
+                  "path": [
+                    "catalog",
+                    "api",
+                    "categories"
+                  ]
+                }
+              },
+              "response": []
             }
-          },
-          "response": []
+          ]
         },
         {
-          "name": "Pobierz wszystkie kategorie",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "http://localhost:3001/api/categories",
-              "protocol": "http",
-              "host": [
-                "localhost"
-              ],
-              "port": "3001",
-              "path": [
-                "api",
-                "categories"
-              ]
+          "name": "MongoDB — szczegoly produktow",
+          "item": [
+            {
+              "name": "Wyszukiwanie pelnotekstowe ($text + $gte)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "http://localhost:3000/catalog/api/products/details/search?keyword=klasyczny",
+                  "protocol": "http",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "3000",
+                  "path": [
+                    "catalog",
+                    "api",
+                    "products",
+                    "details",
+                    "search"
+                  ],
+                  "query": [
+                    {
+                      "key": "keyword",
+                      "value": "klasyczny"
+                    },
+                    {
+                      "key": "minWeight",
+                      "value": "200",
+                      "disabled": true
+                    }
+                  ]
+                },
+                "description": "T5: operatory $text i $gte przez natywny sterownik MongoDB"
+              },
+              "response": []
+            },
+            {
+              "name": "Szczegoly wielu produktow ($in)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "http://localhost:3000/catalog/api/products/details?ids=1,2,3",
+                  "protocol": "http",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "3000",
+                  "path": [
+                    "catalog",
+                    "api",
+                    "products",
+                    "details"
+                  ],
+                  "query": [
+                    {
+                      "key": "ids",
+                      "value": "1,2,3"
+                    }
+                  ]
+                },
+                "description": "T5: operator $in przez natywny sterownik MongoDB"
+              },
+              "response": []
             }
-          },
-          "response": []
+          ]
         },
         {
-          "name": "Pobierz wszystkie produkty",
-          "request": {
-            "method": "GET",
-            "header": []
-          },
-          "response": []
+          "name": "Recenzje",
+          "item": [
+            {
+              "name": "Dodaj recenzje",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"productId\": 5,\n  \"userId\": 1,\n  \"rating\": 5,\n  \"title\": \"Swietny but!\",\n  \"body\": \"Bardzo wygodny i stylowy. Polecam wszystkim.\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "http://localhost:3000/catalog/api/reviews",
+                  "protocol": "http",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "3000",
+                  "path": [
+                    "catalog",
+                    "api",
+                    "reviews"
+                  ]
+                },
+                "description": "T6: zapis przez Mongoose z pre-hookiem i walidacja oceny (1-5)"
+              },
+              "response": []
+            },
+            {
+              "name": "Zatwierdz recenzje (aktualizuje PG + Mongo)",
+              "request": {
+                "method": "PATCH",
+                "header": [],
+                "url": {
+                  "raw": "http://localhost:3000/catalog/api/reviews/6a062589f33e6fa8dfdafd21/approve",
+                  "protocol": "http",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "3000",
+                  "path": [
+                    "catalog",
+                    "api",
+                    "reviews",
+                    "6a062589f33e6fa8dfdafd21",
+                    "approve"
+                  ]
+                },
+                "description": "Hybryda specyficzna: zmiana statusu w Mongo + inkrementacja reviewCount w PG z kompensacja"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Analityka",
+          "item": [
+            {
+              "name": "Agregacja srednich ocen produktow",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "http://localhost:3000/catalog/api/analytics/ratings",
+                  "protocol": "http",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "3000",
+                  "path": [
+                    "catalog",
+                    "api",
+                    "analytics",
+                    "ratings"
+                  ]
+                },
+                "description": "T7: aggregation pipeline ($match, $group, $lookup, $unwind, $sort, $project)"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Koszyk (szkic Mongo)",
+          "item": [
+            {
+              "name": "Utworz szkic koszyka w Mongo",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"cartId\": 1,\n  \"sessionId\": \"session-abc-123\",\n  \"productDetailsId\": \"6a0624b9f33e6fa8dfdafd20\",\n  \"sku\": \"AM1-BLU-42\",\n  \"quantity\": 1\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "http://localhost:3000/catalog/api/cart-draft",
+                  "protocol": "http",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "3000",
+                  "path": [
+                    "catalog",
+                    "api",
+                    "cart-draft"
+                  ]
+                },
+                "description": "T6: zapis szkicu koszyka w MongoDB z historia zdarzen"
+              },
+              "response": []
+            },
+            {
+              "name": "Pobierz szkic koszyka z populate()",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "http://localhost:3000/catalog/api/cart-draft/1",
+                  "protocol": "http",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "3000",
+                  "path": [
+                    "catalog",
+                    "api",
+                    "cart-draft",
+                    "1"
+                  ]
+                },
+                "description": "T6: populate() - dociaga pelny dokument ProductDetails zamiast samego ObjectId"
+              },
+              "response": []
+            }
+          ]
         }
       ]
     },
@@ -103,30 +404,253 @@
       "name": "Checkout Service",
       "item": [
         {
-          "name": "Test blokady Oversell (409)",
-          "request": {
-            "method": "POST",
-            "header": [],
-            "body": {
-              "mode": "raw",
-              "raw": "{\r\n  \"items\": [\r\n    {\r\n      \"sku\": \"DOC-001\",\r\n      \"quantity\": 1\r\n    }\r\n  ]\r\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
+          "name": "Koszyk (PostgreSQL)",
+          "item": [
+            {
+              "name": "Utworz koszyk",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"sessionId\": \"session-abc-123\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "http://localhost:3000/checkout/api/cart",
+                  "protocol": "http",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "3000",
+                  "path": [
+                    "checkout",
+                    "api",
+                    "cart"
+                  ]
+                },
+                "description": "T3: utworzenie koszyka przez Sequelize"
+              },
+              "response": []
             },
+            {
+              "name": "Pobierz koszyk z pozycjami",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "http://localhost:3000/checkout/api/cart/1",
+                  "protocol": "http",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "3000",
+                  "path": [
+                    "checkout",
+                    "api",
+                    "cart",
+                    "1"
+                  ]
+                },
+                "description": "T3: eager loading - CartLine dolaczony do Cart przez include"
+              },
+              "response": []
+            },
+            {
+              "name": "Dodaj produkt do koszyka",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"sku\": \"AM1-BLU-42\",\n  \"quantity\": 1\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "http://localhost:3000/checkout/api/cart/1/items",
+                  "protocol": "http",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "3000",
+                  "path": [
+                    "checkout",
+                    "api",
+                    "cart",
+                    "1",
+                    "items"
+                  ]
+                },
+                "description": "Wymog specyficzny: walidacja stanu magazynowego (409 gdy brak), blokada FOR UPDATE"
+              },
+              "response": []
+            },
+            {
+              "name": "Usun produkt z koszyka",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "http://localhost:3000/checkout/api/cart/1/items/AM1-BLU-42",
+                  "protocol": "http",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "3000",
+                  "path": [
+                    "checkout",
+                    "api",
+                    "cart",
+                    "1",
+                    "items",
+                    "AM1-BLU-42"
+                  ]
+                },
+                "description": "Wymog specyficzny: usuniecie pozycji z otwartego koszyka"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Zamowienia",
+          "item": [
+            {
+              "name": "Zloz zamowienie (checkout)",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"items\": [\n    {\n      \"sku\": \"AM1-BLU-42\",\n      \"quantity\": 1\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "http://localhost:3000/checkout/checkout",
+                  "protocol": "http",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "3000",
+                  "path": [
+                    "checkout",
+                    "checkout"
+                  ]
+                },
+                "description": "T3: transakcja zarzadzana, blokada oversell (409), snapshot ceny w OrderLine"
+              },
+              "response": []
+            },
+            {
+              "name": "Test blokady Oversell (409)",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"items\": [\n    {\n      \"sku\": \"AM1-BLU-42\",\n      \"quantity\": 99999\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "http://localhost:3000/checkout/checkout",
+                  "protocol": "http",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "3000",
+                  "path": [
+                    "checkout",
+                    "checkout"
+                  ]
+                },
+                "description": "Powinno zwrocic 409 - brak wystarczajacego stanu magazynowego"
+              },
+              "response": []
+            },
+            {
+              "name": "Historia zamowien",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "http://localhost:3000/checkout/orders",
+                  "protocol": "http",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "3000",
+                  "path": [
+                    "checkout",
+                    "orders"
+                  ]
+                },
+                "description": "T3: eager loading - OrderLine dolaczony do Order przez include"
+              },
+              "response": []
+            },
+            {
+              "name": "Anuluj zamowienie i przywroc stan",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "http://localhost:3000/checkout/orders/1/cancel",
+                  "protocol": "http",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "3000",
+                  "path": [
+                    "checkout",
+                    "orders",
+                    "1",
+                    "cancel"
+                  ]
+                },
+                "description": "Regula biznesowa: anulowanie przywraca stan magazynowy wszystkich pozycji"
+              },
+              "response": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Gateway",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "method": "GET",
+            "header": [],
             "url": {
-              "raw": "http://localhost:3002/checkout",
+              "raw": "http://localhost:3000/health",
               "protocol": "http",
               "host": [
                 "localhost"
               ],
-              "port": "3002",
+              "port": "3000",
               "path": [
-                "checkout"
+                "health"
               ]
-            }
+            },
+            "description": "Sprawdza czy gateway dziala i pokazuje adresy serwisow"
           },
           "response": []
         }
