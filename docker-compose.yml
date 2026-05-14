@@ -10,7 +10,6 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-uniqwear_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-uniqwear_pass}
       POSTGRES_DB: ${POSTGRES_DB:-uniqwear_db}
-    # wymog t8a: healthcheck dla postgresa
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-uniqwear_user} -d ${POSTGRES_DB:-uniqwear_db}"]
       interval: 5s
@@ -22,14 +21,13 @@ services:
     container_name: uniqwear_mongo
     ports:
       - "${MONGO_PORT:-27017}:27017"
-    # wymog t8a: healthcheck dla mongo
     healthcheck:
       test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
       interval: 5s
       timeout: 5s
       retries: 5
 
-  # wymog t8b: mikroserwis 1 (katalog)
+  # t8b: mikroserwis 1 (katalog)
   catalog-service:
     build:
       context: ./catalog-service
@@ -47,7 +45,7 @@ services:
       mongo:
         condition: service_healthy
 
-  # wymog t8b: mikroserwis 2 (koszyk/zamowienia)
+  # t8b: mikroserwis 2 (koszyk/zamowienia)
   checkout-service:
     build:
       context: ./checkout-service
@@ -64,3 +62,20 @@ services:
         condition: service_healthy
       mongo:
         condition: service_healthy
+
+  # t8b: api gateway - pojedynczy punkt wejscia dla wszystkich serwisow
+  gateway:
+    build:
+      context: ./gateway
+      dockerfile: Dockerfile
+    container_name: uniqwear_gateway
+    ports:
+      - "3000:3000"
+    environment:
+      - GATEWAY_PORT=3000
+      - CATALOG_URL=http://catalog_service:3001
+      - CHECKOUT_URL=http://checkout_service:3002
+    # gateway startuje po serwisach
+    depends_on:
+      - catalog-service
+      - checkout-service
