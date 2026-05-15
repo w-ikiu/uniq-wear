@@ -18,7 +18,11 @@ module.exports = (sequelize, DataTypes) => {
         isIn: [['pending', 'paid', 'cancelled']]
       }
     },
-    totalAmount: DataTypes.DECIMAL
+    totalAmount: DataTypes.DECIMAL,
+    userId: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    }
   }, {
     sequelize,
     modelName: 'Order',
