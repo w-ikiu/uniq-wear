@@ -117,34 +117,303 @@ Wszystkie żądania przechodzą przez Gateway na porcie 3000.
 
 ### Katalog (`/catalog/...`)
 
-| Metoda | Endpoint | Opis |
-|--------|----------|------|
-| GET | /catalog/products | Lista produktów z filtrem (category, minPrice) |
-| GET | /catalog/products/:id | Szczegóły produktu z wariantami (Prisma) |
-| GET | /catalog/api/products/pg/:id | Szczegóły produktu (natywny sterownik pg) |
-| GET | /catalog/api/products/details | Szczegóły wielu produktów z Mongo ($in) |
-| GET | /catalog/api/products/details/search | Wyszukiwanie pełnotekstowe ($text, $gte) |
-| POST | /catalog/api/products/hybrid | Utwórz produkt w PG + Mongo z kompensacją |
-| GET | /catalog/api/categories | Lista kategorii |
-| POST | /catalog/api/categories | Dodaj kategorię |
-| POST | /catalog/api/reviews | Dodaj recenzję |
-| PATCH | /catalog/api/reviews/:id/approve | Zatwierdź recenzję (aktualizuje PG + Mongo) |
-| GET | /catalog/api/analytics/ratings | Agregacja średnich ocen produktów |
-| GET | /catalog/stats/inventory | Statystyki magazynowe ($queryRaw) |
-| POST | /catalog/api/cart-draft | Utwórz/zaktualizuj szkic koszyka w Mongo |
-| GET | /catalog/api/cart-draft/:cartId | Pobierz szkic koszyka z populate() |
+---
+
+#### `GET /catalog/products`
+Lista produktów z filtrem dynamicznym.
+
+Query params: `category`, `minPrice`, `maxPrice`, `available=true`
+
+```
+GET /catalog/products?category=sneakers&minPrice=100&available=true
+```
+```json
+[
+  {
+    "id": 1,
+    "name": "air max 1",
+    "description": "klasyk na kazda okazje.",
+    "categoryId": 1,
+    "categoryName": "sneakers"
+  }
+]
+```
+
+---
+
+#### `GET /catalog/products/:id`
+Szczegóły produktu z wariantami (Prisma, eager loading).
+
+```
+GET /catalog/products/1
+```
+```json
+{
+  "id": 1,
+  "name": "air max 1",
+  "category": { "id": 1, "name": "sneakers" },
+  "variants": [
+    { "id": 1, "sku": "AM1-BLU-42", "price": "699.99", "stock": 10, "size": "42", "color": "blue" }
+  ]
+}
+```
+
+---
+
+#### `POST /catalog/api/products/hybrid`
+Tworzy produkt w PostgreSQL (Prisma) i szczegóły w MongoDB. Kompensacja gdy MongoDB zawiedzie.
+
+```json
+{
+  "name": "Air Force 1",
+  "description": "Klasyczny but",
+  "categoryId": 1,
+  "price": 499.99,
+  "sku": "AF1-WHT-42",
+  "longDescription": "Kultowy model z białej skóry premium"
+}
+```
+**201 Created:**
+```json
+{
+  "message": "produkt utworzony w obu bazach",
+  "pg": { "id": 2, "name": "Air Force 1", "categoryId": 1 },
+  "mongo": { "_id": "...", "productId": 2, "long_description": "Kultowy model..." }
+}
+```
+
+---
+
+#### `POST /catalog/api/categories`
+Tworzy nową kategorię.
+
+```json
+{ "name": "boots" }
+```
+**201 Created:**
+```json
+{ "id": 2, "name": "boots" }
+```
+
+---
+
+#### `POST /catalog/api/reviews`
+Dodaje recenzję (walidacja Mongoose: rating 1-5, pre-hook moderacji).
+
+```json
+{
+  "productId": 1,
+  "userId": 42,
+  "rating": 5,
+  "title": "Świetny produkt",
+  "body": "Bardzo polecam, wygodne i trwałe"
+}
+```
+**201 Created:**
+```json
+{
+  "_id": "664abc...",
+  "productId": 1,
+  "userId": 42,
+  "rating": 5,
+  "title": "Świetny produkt",
+  "status": "pending"
+}
+```
+**400 Bad Request** (niepoprawna ocena):
+```json
+{ "error": "ocena musi byc w przedziale od 1 do 5", "code": 400, "details": null }
+```
+
+---
+
+#### `PATCH /catalog/api/reviews/:id/approve`
+Zatwierdza recenzję: zmienia status w MongoDB, inkrementuje `reviewCount` w PostgreSQL. Kompensacja gdy PG zawiedzie.
+
+```
+PATCH /catalog/api/reviews/664abc.../approve
+```
+**200 OK:**
+```json
+{
+  "message": "recenzja zatwierdzona, licznik zaktualizowany",
+  "review": { "_id": "664abc...", "status": "approved" }
+}
+```
+
+---
+
+#### `GET /catalog/api/analytics/ratings`
+Aggregation pipeline MongoDB: średnia ocena per produkt ($match → $group → $lookup → $unwind → $sort → $project).
+
+```
+GET /catalog/api/analytics/ratings
+```
+```json
+[
+  { "productId": 1, "averageRating": 4.75, "reviewCount": 8, "description": "Kultowy model..." }
+]
+```
+
+---
+
+#### `GET /catalog/stats/inventory`
+Statystyki stanu magazynowego per kategoria (`$queryRaw` Prisma).
+
+```
+GET /catalog/stats/inventory?minStock=5
+```
+```json
+[
+  { "categoryId": 1, "totalStock": 42 }
+]
+```
+
+---
+
+#### `POST /catalog/api/cart-draft`
+Tworzy lub aktualizuje szkic koszyka w MongoDB (Mongoose, subdokumenty).
+
+```json
+{
+  "cartId": 7,
+  "sessionId": "sess-abc123",
+  "productDetailsId": "664def...",
+  "sku": "AM1-BLU-42",
+  "quantity": 2
+}
+```
+**201 Created:**
+```json
+{
+  "_id": "...",
+  "cartId": 7,
+  "items": [{ "sku": "AM1-BLU-42", "quantity": 2 }],
+  "events": [{ "type": "item_added", "sku": "AM1-BLU-42" }],
+  "status": "open"
+}
+```
+
+---
 
 ### Koszyk i zamówienia (`/checkout/...`)
 
-| Metoda | Endpoint | Opis |
-|--------|----------|------|
-| POST | /checkout/api/cart | Utwórz koszyk |
-| GET | /checkout/api/cart/:id | Pobierz koszyk z pozycjami |
-| POST | /checkout/api/cart/:id/items | Dodaj produkt do koszyka (walidacja stanu) |
-| DELETE | /checkout/api/cart/:id/items/:sku | Usuń produkt z koszyka |
-| POST | /checkout/checkout | Złóż zamówienie (blokada oversell) |
-| GET | /checkout/orders | Historia zamówień |
-| POST | /checkout/orders/:id/cancel | Anuluj zamówienie (przywraca stan) |
+---
+
+#### `POST /checkout/api/cart`
+Tworzy nowy koszyk w PostgreSQL.
+
+```json
+{ "sessionId": "sess-xyz789" }
+```
+**201 Created:**
+```json
+{ "id": 7, "sessionId": "sess-xyz789", "status": "open" }
+```
+
+---
+
+#### `POST /checkout/api/cart/:id/items`
+Dodaje pozycję do koszyka z walidacją stanu magazynowego (blokada FOR UPDATE).
+
+```
+POST /checkout/api/cart/7/items
+```
+```json
+{ "sku": "AM1-BLU-42", "quantity": 2 }
+```
+**201 Created:**
+```json
+{
+  "id": 7,
+  "status": "open",
+  "lines": [{ "id": 1, "sku": "AM1-BLU-42", "price": "699.99", "quantity": 2 }]
+}
+```
+**409 Conflict** (brak stanu):
+```json
+{ "error": "blad dodawania do koszyka", "code": 409, "details": "niewystarczajacy stan dla AM1-BLU-42: dostepne 1" }
+```
+
+---
+
+#### `DELETE /checkout/api/cart/:id/items/:sku`
+Usuwa pozycję z koszyka.
+
+```
+DELETE /checkout/api/cart/7/items/AM1-BLU-42
+```
+**200 OK:**
+```json
+{ "message": "pozycja usunieta z koszyka" }
+```
+
+---
+
+#### `POST /checkout/checkout`
+Składa zamówienie z blokadą oversell. Opcjonalnie zamyka CartDraft w MongoDB (T8c hybryda).
+
+```json
+{
+  "items": [{ "sku": "AM1-BLU-42", "quantity": 1 }],
+  "userId": 42,
+  "cartId": 7
+}
+```
+**201 Created:**
+```json
+{ "message": "zamowienie zlozone", "order": { "id": 3, "totalAmount": "699.99", "status": "paid", "userId": 42 } }
+```
+**409 Conflict** (oversell):
+```json
+{ "error": "blad checkoutu", "code": 409, "details": "brak wystarczajacej ilosci dla AM1-BLU-42" }
+```
+
+---
+
+#### `GET /checkout/orders`
+Historia zamówień, opcjonalnie filtrowana po użytkowniku.
+
+```
+GET /checkout/orders?userId=42
+```
+```json
+[
+  {
+    "id": 3,
+    "status": "paid",
+    "totalAmount": "699.99",
+    "userId": 42,
+    "lines": [{ "sku": "AM1-BLU-42", "price": "699.99", "quantity": 1 }]
+  }
+]
+```
+
+---
+
+#### `POST /checkout/orders/:id/cancel`
+Anuluje zamówienie i przywraca stan magazynowy (transakcja Sequelize).
+
+```
+POST /checkout/orders/3/cancel
+```
+**200 OK:**
+```json
+{ "message": "zamowienie anulowane, stan magazynowy przywrocony" }
+```
+**400 Bad Request** (już anulowane):
+```json
+{ "error": "blad anulowania zamowienia", "code": 400, "details": "zamowienie jest juz anulowane" }
+```
+
+---
+
+### Format błędów
+
+Każdy błąd w API ma jednolity format:
+```json
+{ "error": "opis błędu", "code": 404, "details": "szczegóły dla dewelopera" }
+```
 
 ## Reguły biznesowe
 
@@ -169,39 +438,3 @@ Wszystkie żądania przechodzą przez Gateway na porcie 3000.
 - **Brak rate limitingu** - Gateway nie ogranicza liczby żądań. W produkcji należy dodać np. `express-rate-limit`
 - **Brak HTTPS** - komunikacja odbywa się po HTTP. W produkcji należy skonfigurować TLS/SSL
 - **Zmienne środowiskowe** - hasła do baz danych są w plikach `.env` które są wykluczone z repozytorium przez `.gitignore`. Nigdy nie commituj pliku `.env`
-
-
-# Projekt
-
-<p class="editor-paragraph mb-2" dir="ltr"><span style="white-space: pre-wrap;">System serwerowy dla punktu zamówień (kiosk): katalog pozycji z wariantami i modyfikatorami, koszyk sesyjny, naliczanie cen, składanie zamówienia i potwierdzenie płatności (symulacja lub status). PostgreSQL: transakcyjna spójność stanów magazynowych, zamówień i pozycji. MongoDB: szkice konfiguracji koszyka, zdarzenia telemetryczne kroku składania (dla analityki i audytu UX po stronie serwera). Bez oceny interfejsu dotykowego — tylko API i modele danych.</span></p>
-
-## Opis Wyzwania
-<h2 class="editor-heading-h2 text-2xl font-semibold mb-3" dir="ltr" style="text-align: start;"><b><strong class="editor-text-bold font-bold" style="white-space: pre-wrap;">Repozytorium i wybór tematu</strong></b><span style="white-space: pre-wrap;">&nbsp;</span></h2><p class="editor-paragraph mb-2" dir="ltr" style="text-align: start;"><span style="white-space: pre-wrap;">Cały proces został przeniesiony na platformę&nbsp;</span><b><strong class="editor-text-bold font-bold" style="white-space: pre-wrap;">GitLab</strong></b><span style="white-space: pre-wrap;">. Repozytorium tworzy się automatycznie po kliknięciu&nbsp;</span><b><strong class="editor-text-bold font-bold" style="white-space: pre-wrap;">odpowiedniego przycisku</strong></b><span style="white-space: pre-wrap;">. Proszę pamiętać, że pełna lista wymagań pojawi się dopiero po&nbsp;</span><b><strong class="editor-text-bold font-bold" style="white-space: pre-wrap;">wybraniu konkretnego tematu</strong></b><span style="white-space: pre-wrap;">&nbsp;w systemie.</span></p><h2 class="editor-heading-h2 text-2xl font-semibold mb-3" dir="ltr" style="text-align: start;"><b><strong class="editor-text-bold font-bold" style="white-space: pre-wrap;">Terminy</strong></b><span style="white-space: pre-wrap;">&nbsp;</span></h2><p class="editor-paragraph mb-2" dir="ltr" style="text-align: start;"><span style="white-space: pre-wrap;">Termin oddania prac upływa&nbsp;</span><b><strong class="editor-text-bold font-bold" style="white-space: pre-wrap;">01.06.2026 r.</strong></b><span style="white-space: pre-wrap;">&nbsp;Jest to data graniczna pozwalająca na uzyskanie 100% punktów. W przypadku spóźnień będą naliczane kary procentowe za każdy dzień zwłoki (szczegółowe zasady u prowadzących grupy).</span></p><h2 class="editor-heading-h2 text-2xl font-semibold mb-3" dir="ltr" style="text-align: start;"><b><strong class="editor-text-bold font-bold" style="white-space: pre-wrap;">Zakres oceny</strong></b><span style="white-space: pre-wrap;">&nbsp;</span></h2><p class="editor-paragraph mb-2" dir="ltr" style="text-align: start;"><span style="white-space: pre-wrap;">Ocenie podlega wyłącznie część serwerowa oraz baza danych. Warstwa kliencka jest dowolna – do prezentacji działania projektu można wykorzystać prosty frontend lub po prostu kolekcję w programie Postman.</span></p><h2 class="editor-heading-h2 text-2xl font-semibold mb-3" dir="ltr" style="text-align: start;"><b><strong class="editor-text-bold font-bold" style="white-space: pre-wrap;">Punktacja</strong></b><span style="white-space: pre-wrap;">&nbsp;</span></h2><p class="editor-paragraph mb-2" dir="ltr" style="text-align: start;"><span style="white-space: pre-wrap;">Struktura oceny pozwala na uzyskanie łącznie 115% punktów:</span></p><ul class="editor-list-ul list-disc pl-6 mb-2"><li value="1" dir="ltr"><span style="white-space: pre-wrap;">Wymagania techniczne (T1–T8):&nbsp;</span><b><strong class="editor-text-bold font-bold" style="white-space: pre-wrap;">60%</strong></b></li><li value="2" dir="ltr"><span style="white-space: pre-wrap;">Wymagania dodatkowe:&nbsp;</span><b><strong class="editor-text-bold font-bold" style="white-space: pre-wrap;">15%</strong></b></li><li value="3" dir="ltr"><span style="white-space: pre-wrap;">Wymagania funkcjonalne (zależne od tematu):&nbsp;</span><b><strong class="editor-text-bold font-bold" style="white-space: pre-wrap;">40%</strong></b></li></ul>
-
-## Kryteria Oceny
-Całkowita liczba punktów: 26
-
-| Wymaganie | Opis | Waga |
-|-----------|------|------|
-| Wymaganie | Pula połączeń singleton, zapytania parametryzowane ($1, $2), mapowanie kodów PostgreSQL (np. 23505, 23503) na HTTP. | 7% |
-| Wymaganie | Schemat wyłącznie przez migracje (min. 2 addytywne), seedy domenowe, min. 1 endpoint z dynamicznym where bez sklejania SQL z stringów. | 7% |
-| Wymaganie | Min. 2 modele z walidacją, relacje użyte w endpointach, eager loading (include), hook domenowy, transakcja zarządzana. | 7% |
-| Wymaganie | Min. 2 modele z relacjami, historia migracji (migrate deploy na czystej bazie), CRUD przez PrismaClient bez any, min. 1 $queryRaw (tagged template). | 7% |
-| Wymaganie | Singleton MongoClient, zamknięcie przy SIGINT, zasób domenowy sterownikiem natywnym, min. 3 różne operatory w realnych endpointach, indeks złożony lub tekstowy. | 6% |
-| Wymaganie | Min. 2 schematy z walidatorami niestandardowymi, subdokument lub tablica zagnieżdżona, pre hook, populate w endpoincie, methods lub statics. | 6% |
-| Wymaganie | Pipeline z $match, $group, $project i min. jednym dodatkowym stage; $lookup; pierwszy $match pod indeks; endpoint analityczny — agregacja w bazie. | 6% |
-| Wymaganie | docker compose up bez kroków ręcznych, multi-stage Dockerfile, healthchecki, depends_on service_healthy, .env.example. | 4% |
-| Wymaganie | Min. 2 serwisy Node w osobnych kontenerach, podział per silnik BD, komunikacja HTTP/broker, API Gateway, migracje/seedy z compose. | 5% |
-| Wymaganie | Min. 1 operacja zapisu do PG i Mongo z rollbackiem lub kompensacją; jednolity format błędów { error, code, details }. | 5% |
-| Wymaganie | Repozytorium zawiera README: jak uruchomić (compose), zmienne środowiskowe, podział serwisów, diagram lub opis przepływu danych PG/Mongo. | 4% |
-| Wymaganie | Publikowalna specyfikacja OpenAPI 3.x lub równoważna lista endpointów z przykładowymi żądaniami/odpowiedziami. | 4% |
-| Wymaganie | Min. zestaw testów integracyjnych lub e2e krytycznych ścieżek API (np. supertest + baza testowa). | 4% |
-| Wymaganie | Walidacja wejścia, brak wycieku stack trace do klienta, jawna obsługa błędów SQL/Mongo; krótki opis zagrożeń w README. | 3% |
-| Wymaganie | PostgreSQL: kategorie i pozycje menu; warianty rozmiaru/wersji; modyfikatory z ceną; zamówienia i order_lines ze snapshotem ceny; stany magazynowe lub limity dzienne (prosty model wystarczalny). Transakcje przy finalizacji. | 10% |
-| Wymaganie | MongoDB: dokument cart_draft (sessionId lub userId, wybrane pozycje z konfiguracją); event_log kroków (dodanie pozycji, zmiana modyfikatora, anulowanie) pod raporty i pipeline agregujący (T7). | 8% |
-| Wymaganie | Endpointy listy menu z filtrowaniem (dynamiczny where). Dodawanie/usuwanie pozycji w koszyku (serwerowy stan, nie localStorage). POST checkout z walidacją dostępności i sumy; idempotencja lub klucz żądania przy powtórzeniu (opcjonalnie). | 8% |
-| Wymaganie | Niedostępna pozycja lub przekroczony limit — 409/400 z kodem domenowym. Zmiana cennika nie wpływa na już złożone zamówienia (snapshot w liniach). Usunięcie pozycji z menu — polityka dla otwartych koszyków (jawnie opisana). | 8% |
-| Wymaganie | Finalizacja zamówienia: zapis w PG + zamknięcie/zarchiwizowanie draftu i dopisanie zdarzenia „completed” w Mongo z kompensacją przy błędzie drugiego zapisu (T8c). | 6% |
-
-## Zgłoszenie Rozwiązania
-Proszę zaimplementować swoje rozwiązanie w tym repozytorium. Kiedy będziesz gotowy, prześlij link do tego repozytorium na platformie Cursora (cursora.org).
