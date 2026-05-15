@@ -9,5 +9,11 @@ npx prisma migrate deploy 2>/dev/null || {
   npx prisma migrate deploy
 }
 
+echo "uruchamianie migracji knex..."
+npx knex migrate:latest
+
+echo "uruchamianie seedow knex..."
+npx knex seed:run
+
 echo "startuje catalog-service..."
 exec node app.js
