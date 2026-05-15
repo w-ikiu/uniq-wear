@@ -2,9 +2,9 @@ const mongoose = require('mongoose');
 
 // zdarzenie w koszyku (historia akcji uzytkownika)
 const cartEventSchema = new mongoose.Schema({
-  type: { 
-    type: String, 
-    enum: ['item_added', 'item_removed', 'quantity_changed'],
+  type: {
+    type: String,
+    enum: ['item_added', 'item_removed', 'quantity_changed', 'completed'],
     required: true
   },
   sku: { type: String, required: true },
