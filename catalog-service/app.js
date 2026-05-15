@@ -40,9 +40,10 @@ app.get('/api/products/pg/:id', async (req, res) => {
 });
 
 // t2: endpoint z dynamicznym where bez sklejania stringow
+// wymog specyficzny: filtr po kategorii, cenie i dostepnosci
 app.get('/products', async (req, res) => {
   try {
-    const { category, minPrice, maxPrice } = req.query;
+    const { category, minPrice, maxPrice, available } = req.query;
 
     // budowanie dynamicznego zapytania knex
     const query = knex('Product')
@@ -54,12 +55,30 @@ app.get('/products', async (req, res) => {
     }
 
     if (minPrice) {
-      // uzywamy variantow do filtrowania po cenie
       query.whereExists(function() {
         this.select('*')
           .from('Variant')
           .whereRaw('"Variant"."productId" = "Product"."id"')
           .andWhere('price', '>=', parseFloat(minPrice));
+      });
+    }
+
+    if (maxPrice) {
+      query.whereExists(function() {
+        this.select('*')
+          .from('Variant')
+          .whereRaw('"Variant"."productId" = "Product"."id"')
+          .andWhere('price', '<=', parseFloat(maxPrice));
+      });
+    }
+
+    if (available === 'true') {
+      // tylko produkty z co najmniej jednym wariantem z stock > 0
+      query.whereExists(function() {
+        this.select('*')
+          .from('Variant')
+          .whereRaw('"Variant"."productId" = "Product"."id"')
+          .andWhere('stock', '>', 0);
       });
     }
 
