@@ -21,7 +21,8 @@ beforeAll(async () => {
       categoryId: categoryId,
       price: 100.00,
       sku: sku,
-      longDescription: 'Opis testowy buta do testow automatycznych'
+      longDescription: 'Opis testowy buta do testow automatycznych',
+      stock: 10  // dodane!
     });
 
   console.log('product response:', JSON.stringify(productResponse.body));
@@ -31,10 +32,10 @@ beforeAll(async () => {
 
 describe('Checkout Service - testy integracyjne', () => {
 
-  describe('POST /checkout', () => {
+  describe('POST /api/checkout', () => {
     it('powinno zwrocic 409 gdy brak wystarczajacego stanu', async () => {
       const response = await request(BASE_URL)
-        .post('/checkout')
+        .post('/api/checkout')
         .send({
           items: [{ sku: global.testSku, quantity: 99999 }]
         });
@@ -47,7 +48,7 @@ describe('Checkout Service - testy integracyjne', () => {
 
     it('powinno zwrocic 404 gdy SKU nie istnieje', async () => {
       const response = await request(BASE_URL)
-        .post('/checkout')
+        .post('/api/checkout')
         .send({
           items: [{ sku: 'NIEISTNIEJACY-SKU-XYZ', quantity: 1 }]
         });
@@ -57,10 +58,10 @@ describe('Checkout Service - testy integracyjne', () => {
     });
   });
 
-  describe('GET /orders', () => {
+  describe('GET /api/orders', () => {
     it('powinno zwrocic liste zamowien', async () => {
       const response = await request(BASE_URL)
-        .get('/orders');
+        .get('/api/orders');
 
       expect(response.status).toBe(200);
       expect(Array.isArray(response.body)).toBe(true);
@@ -107,7 +108,7 @@ describe('Checkout Service - testy integracyjne', () => {
   describe('Format bledow', () => {
     it('bledy powinny miec format { error, code, details }', async () => {
       const response = await request(BASE_URL)
-        .post('/checkout')
+        .post('/api/checkout')
         .send({
           items: [{ sku: 'NIEISTNIEJACY', quantity: 1 }]
         });
