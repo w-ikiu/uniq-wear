@@ -23,7 +23,7 @@ const reviewSchema = new mongoose.Schema({
   },
   title: String,
   body: String,
-  // wymog t6: tablica zagniezdona subdokumentow
+  // wymog t6: tablica zagniezdzona subdokumentow
   moderationHistory: [moderationSchema] 
 });
 

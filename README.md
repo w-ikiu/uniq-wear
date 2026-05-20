@@ -1,4 +1,4 @@
-# UniqWear - Microservices E-commerce API
+﻿# UniqWear — Microservices E-commerce API
 
 Backend dla sklepu internetowego zbudowany w architekturze mikroserwisów.
 
@@ -70,7 +70,7 @@ CATALOG_URL=http://catalog_service:3001
 CHECKOUT_URL=http://checkout_service:3002
 ```
 
-## Przepływ danych - co trafia do której bazy
+## Przepływ danych — co trafia do której bazy
 
 ```
 PostgreSQL (dane twarde, relacyjne):
@@ -104,11 +104,11 @@ MongoDB (dane miękkie, dokumentowe):
 3. Jeśli PostgreSQL zawiedzie → cofnij zmianę statusu w MongoDB (kompensacja)
 ```
 
-**Dodanie do koszyka** (`POST /checkout/api/cart/:id/items`):
+**Finalizacja zamówienia** (`POST /checkout/checkout`):
 ```
-1. Sprawdź stan magazynowy w PostgreSQL (blokada FOR UPDATE)
-2. Zapisz CartLine w PostgreSQL
-3. Zaktualizuj CartDraft w MongoDB (przez osobny endpoint)
+1. Zapisz zamówienie w PostgreSQL (transakcja Sequelize)
+2. Zamknij CartDraft w MongoDB (status: closed, event: completed)
+3. Jeśli MongoDB zawiedzie → anuluj zamówienie i przywróć stan w PostgreSQL (kompensacja)
 ```
 
 ## Endpointy API
@@ -160,6 +160,46 @@ GET /catalog/products/1
 
 ---
 
+#### `GET /catalog/api/products/pg/:id`
+Szczegóły produktu przez natywny sterownik pg (zapytanie parametryzowane $1).
+
+```
+GET /catalog/api/products/pg/1
+```
+```json
+{ "id": 1, "name": "air max 1", "categoryId": 1 }
+```
+
+---
+
+#### `GET /catalog/api/products/details`
+Szczegóły wielu produktów z MongoDB (operator $in).
+
+```
+GET /catalog/api/products/details?ids=1,2,3
+```
+```json
+[
+  { "productId": 1, "long_description": "Klasyczny but...", "specs": {}, "gallery": [] }
+]
+```
+
+---
+
+#### `GET /catalog/api/products/details/search`
+Wyszukiwanie pełnotekstowe w MongoDB (operatory $text, $gte).
+
+```
+GET /catalog/api/products/details/search?keyword=klasyczny&minWeight=200
+```
+```json
+[
+  { "productId": 1, "long_description": "Klasyczny but na każdą okazję..." }
+]
+```
+
+---
+
 #### `POST /catalog/api/products/hybrid`
 Tworzy produkt w PostgreSQL (Prisma) i szczegóły w MongoDB. Kompensacja gdy MongoDB zawiedzie.
 
@@ -180,6 +220,15 @@ Tworzy produkt w PostgreSQL (Prisma) i szczegóły w MongoDB. Kompensacja gdy Mo
   "pg": { "id": 2, "name": "Air Force 1", "categoryId": 1 },
   "mongo": { "_id": "...", "productId": 2, "long_description": "Kultowy model..." }
 }
+```
+
+---
+
+#### `GET /catalog/api/categories`
+Lista wszystkich kategorii.
+
+```json
+[{ "id": 1, "name": "sneakers" }]
 ```
 
 ---
@@ -216,7 +265,6 @@ Dodaje recenzję (walidacja Mongoose: rating 1-5, pre-hook moderacji).
   "productId": 1,
   "userId": 42,
   "rating": 5,
-  "title": "Świetny produkt",
   "status": "pending"
 }
 ```
@@ -264,9 +312,7 @@ Statystyki stanu magazynowego per kategoria (`$queryRaw` Prisma).
 GET /catalog/stats/inventory?minStock=5
 ```
 ```json
-[
-  { "categoryId": 1, "totalStock": 42 }
-]
+[{ "categoryId": 1, "totalStock": 42 }]
 ```
 
 ---
@@ -296,6 +342,26 @@ Tworzy lub aktualizuje szkic koszyka w MongoDB (Mongoose, subdokumenty).
 
 ---
 
+#### `GET /catalog/api/cart-draft/:cartId`
+Pobiera szkic koszyka z pełnymi szczegółami produktu (populate()).
+
+```
+GET /catalog/api/cart-draft/1
+```
+```json
+{
+  "cartId": 1,
+  "items": [{
+    "productDetails": { "_id": "...", "long_description": "Klasyczny but...", "gallery": [] },
+    "sku": "AM1-BLU-42",
+    "quantity": 2
+  }],
+  "status": "open"
+}
+```
+
+---
+
 ### Koszyk i zamówienia (`/checkout/...`)
 
 ---
@@ -313,12 +379,25 @@ Tworzy nowy koszyk w PostgreSQL.
 
 ---
 
+#### `GET /checkout/api/cart/:id`
+Pobiera koszyk z pozycjami (eager loading).
+
+```
+GET /checkout/api/cart/7
+```
+```json
+{
+  "id": 7,
+  "status": "open",
+  "lines": [{ "sku": "AM1-BLU-42", "price": "699.99", "quantity": 2 }]
+}
+```
+
+---
+
 #### `POST /checkout/api/cart/:id/items`
 Dodaje pozycję do koszyka z walidacją stanu magazynowego (blokada FOR UPDATE).
 
-```
-POST /checkout/api/cart/7/items
-```
 ```json
 { "sku": "AM1-BLU-42", "quantity": 2 }
 ```
@@ -327,7 +406,7 @@ POST /checkout/api/cart/7/items
 {
   "id": 7,
   "status": "open",
-  "lines": [{ "id": 1, "sku": "AM1-BLU-42", "price": "699.99", "quantity": 2 }]
+  "lines": [{ "sku": "AM1-BLU-42", "price": "699.99", "quantity": 2 }]
 }
 ```
 **409 Conflict** (brak stanu):
@@ -408,6 +487,17 @@ POST /checkout/orders/3/cancel
 
 ---
 
+### Gateway
+
+#### `GET /health`
+Sprawdza czy gateway działa i pokazuje adresy serwisów.
+
+```json
+{ "status": "ok", "services": { "catalog": "http://catalog_service:3001", "checkout": "http://checkout_service:3002" } }
+```
+
+---
+
 ### Format błędów
 
 Każdy błąd w API ma jednolity format:
@@ -417,24 +507,24 @@ Każdy błąd w API ma jednolity format:
 
 ## Reguły biznesowe
 
-- **Snapshot ceny** - zmiana cennika nie wpływa na już złożone zamówienia ani pozycje koszyka
-- **Blokada oversell** - checkout zwraca 409 gdy brak wystarczającego stanu magazynowego
-- **Anulowanie zamówienia** - przywraca stan magazynowy wszystkich pozycji
-- **Polityka dla otwartych koszyków** - jeśli produkt zniknie z menu, pozycje pozostają w koszyku aż do ręcznego usunięcia lub zamknięcia koszyka
-- **Unikalność SKU** - próba dodania duplikatu zwraca 409
+- **Snapshot ceny** — zmiana cennika nie wpływa na już złożone zamówienia ani pozycje koszyka
+- **Blokada oversell** — checkout zwraca 409 gdy brak wystarczającego stanu magazynowego
+- **Anulowanie zamówienia** — przywraca stan magazynowy wszystkich pozycji
+- **Polityka dla otwartych koszyków** — jeśli produkt zniknie z menu, pozycje pozostają w koszyku aż do ręcznego usunięcia lub zamknięcia koszyka
+- **Unikalność SKU** — próba dodania duplikatu zwraca 409
 
 ## Bezpieczeństwo
 
 ### Zaimplementowane zabezpieczenia
 
-- **Zapytania parametryzowane** - wszystkie zapytania SQL używają placeholderów (`$1`, `$2` w pg, `:param` w Sequelize) zamiast sklejania stringów. Chroni przed SQL injection.
-- **Brak stack trace w odpowiedziach** - błędy zwracają tylko `{ error, code, details }` bez wewnętrznych szczegółów implementacji
-- **Walidacja wejścia** - modele Sequelize i Mongoose walidują dane przed zapisem (typy, zakresy, wymagane pola)
-- **Jednolity format błędów** - każdy błąd ma ten sam format `{ error, code, details }` co ułatwia obsługę po stronie klienta
+- **Zapytania parametryzowane** — wszystkie zapytania SQL używają placeholderów (`$1`, `$2` w pg, `:param` w Sequelize) zamiast sklejania stringów. Chroni przed SQL injection.
+- **Brak stack trace w odpowiedziach** — błędy zwracają tylko `{ error, code, details }` bez wewnętrznych szczegółów implementacji
+- **Walidacja wejścia** — modele Sequelize i Mongoose walidują dane przed zapisem (typy, zakresy, wymagane pola)
+- **Jednolity format błędów** — każdy błąd ma ten sam format `{ error, code, details }` co ułatwia obsługę po stronie klienta
 
 ### Potencjalne zagrożenia i ograniczenia
 
-- **Brak autoryzacji i autentykacji** - API jest w pełni otwarte. W produkcji należy dodać JWT lub OAuth w warstwie Gateway
-- **Brak rate limitingu** - Gateway nie ogranicza liczby żądań. W produkcji należy dodać np. `express-rate-limit`
-- **Brak HTTPS** - komunikacja odbywa się po HTTP. W produkcji należy skonfigurować TLS/SSL
-- **Zmienne środowiskowe** - hasła do baz danych są w plikach `.env` które są wykluczone z repozytorium przez `.gitignore`. Nigdy nie commituj pliku `.env`
+- **Brak autoryzacji i autentykacji** — API jest w pełni otwarte. W produkcji należy dodać JWT lub OAuth w warstwie Gateway
+- **Brak rate limitingu** — Gateway nie ogranicza liczby żądań. W produkcji należy dodać np. `express-rate-limit`
+- **Brak HTTPS** — komunikacja odbywa się po HTTP. W produkcji należy skonfigurować TLS/SSL
+- **Zmienne środowiskowe** — hasła do baz danych są w plikach `.env` które są wykluczone z repozytorium przez `.gitignore`. Nigdy nie commituj pliku `.env`

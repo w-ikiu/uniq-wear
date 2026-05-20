@@ -17,6 +17,7 @@ const reviewSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now }
 });
 
+// pre hook
 reviewSchema.pre('save', function() {
   const badWords = ['cholera', 'kurcze'];
   const hasBadWords = badWords.some(word => 

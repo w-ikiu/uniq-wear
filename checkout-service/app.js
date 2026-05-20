@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const { sequelize, Order, OrderLine, Cart, CartLine } = require('./models');
 const connectMongo = require('./config/mongo');
+const Review = require('./models/review');
 
 const app = express();
 app.use(express.json());
@@ -13,7 +14,7 @@ connectMongo();
 // t3: transakcja zarzadzana (sequelize.transaction)
 // t3: blokada FOR UPDATE zapobiega wyscigom przy rownoczesnych zamowieniach
 // regula biznesowa: snapshot ceny w order_lines (zmiana cennika nie wplywa na zlezone zamowienia)
-app.post('/checkout', async (req, res) => {
+app.post('/api/checkout', async (req, res) => {
   const { items, userId, cartId } = req.body;
   let createdOrder;
   let savedLines;
@@ -106,7 +107,7 @@ app.post('/checkout', async (req, res) => {
 
 // wymog specyficzny: historia zamowien uzytkownika
 // t3: eager loading - OrderLine dolaczony do Order przez include
-app.get('/orders', async (req, res) => {
+app.get('/api/orders', async (req, res) => {
   try {
     const where = {};
     if (req.query.userId) {
@@ -131,7 +132,7 @@ app.get('/orders', async (req, res) => {
 // wymog specyficzny: anulowanie zamowienia
 // t3: transakcja zarzadzana
 // regula biznesowa: anulowanie przywraca stan magazynowy (jawnie opisane)
-app.post('/orders/:id/cancel', async (req, res) => {
+app.post('/api/orders/:id/cancel', async (req, res) => {
   try {
     await sequelize.transaction(async (t) => {
       const order = await Order.findByPk(req.params.id, {
@@ -304,6 +305,21 @@ app.get('/api/cart/:id', async (req, res) => {
       error: 'blad pobierania koszyka', 
       code: 500, 
       details: error.message 
+    });
+  }
+});
+
+// t6: statics - pobieranie zatwierdzonych recenzji produktu
+// uzywamy Review.findApproved() - metody statycznej zdefiniowanej w modelu
+app.get('/api/reviews/:productId', async (req, res) => {
+  try {
+    const reviews = await Review.findApproved(parseInt(req.params.productId));
+    res.json(reviews);
+  } catch (error) {
+    res.status(500).json({
+      error: 'blad pobierania recenzji',
+      code: 500,
+      details: error.message
     });
   }
 });

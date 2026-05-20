@@ -84,7 +84,7 @@ describe('Catalog Service - testy integracyjne', () => {
   describe('GET /products', () => {
     it('powinno zwrocic liste produktow', async () => {
       const response = await request(BASE_URL)
-        .get('/products');
+        .get('/api/products');
 
       expect(response.status).toBe(200);
       expect(Array.isArray(response.body)).toBe(true);
@@ -92,7 +92,7 @@ describe('Catalog Service - testy integracyjne', () => {
 
     it('powinno filtrowac produkty po kategorii', async () => {
       const response = await request(BASE_URL)
-        .get('/products?category=sneakers');
+        .get('/api/products?category=sneakers');
 
       expect(response.status).toBe(200);
       expect(Array.isArray(response.body)).toBe(true);

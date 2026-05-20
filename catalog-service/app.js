@@ -2,6 +2,7 @@ require('dotenv').config();
 
 const { query } = require('./db');
 const express = require('express');
+
 const { PrismaClient } = require('@prisma/client');
 
 const knex = require('./knex-client');
@@ -41,7 +42,7 @@ app.get('/api/products/pg/:id', async (req, res) => {
 
 // t2: endpoint z dynamicznym where bez sklejania stringow
 // wymog specyficzny: filtr po kategorii, cenie i dostepnosci
-app.get('/products', async (req, res) => {
+app.get('/api/products', async (req, res) => {
   try {
     const { category, minPrice, maxPrice, available } = req.query;
 
@@ -90,7 +91,7 @@ app.get('/products', async (req, res) => {
 });
 
 // t4: crud przez prismaclient - pobieranie szczegolow z relacjami
-app.get('/products/:id', async (req, res) => {
+app.get('/api/products/:id', async (req, res) => {
   try {
     const product = await prisma.product.findUnique({
       where: { id: parseInt(req.params.id) },
@@ -113,7 +114,7 @@ app.get('/products/:id', async (req, res) => {
 });
 
 // t4: min. 1 $queryraw (tagged template literal) - statystyki magazynowe
-app.get('/stats/inventory', async (req, res) => {
+app.get('/api/stats/inventory', async (req, res) => {
   try {
     // parametryzacja dla bezpieczenstwa (zapobiega sql injection)
     const minStock = parseInt(req.query.minStock || 0);
@@ -209,7 +210,7 @@ app.post('/api/reviews', async (req, res) => {
       status: req.body.status
     });
     
-    // save() automatycznie uruchamia walidatory i nasz pre-hook (cenzure)
+    // save() automatycznie uruchamia walidatory i pre-hook
     await review.save(); 
     res.status(201).json(review);
   } catch (error) {
@@ -492,13 +493,13 @@ app.listen(PORT, () => {
 process.on('SIGINT', async () => {
   console.log('\nodebrano sygnal zamkniecia.');
 
-  // 1. ustawiamy bezpiecznik - po 2 sekundach bezwzglednie zabijamy proces
+  // 1. po 2 sekundach bezwzglednie zabijamy proces
   setTimeout(() => {
     console.error('timeout - wymuszone zabicie procesu');
     process.exit(0);
   }, 2000);
 
-  // 2. probujemy kulturalnie zamknac polaczenia
+  // 2. probujemy "kulturalnie" zamknac polaczenia
   try {
     if (mongoose.connection.readyState !== 0) {
       await mongoose.connection.close();

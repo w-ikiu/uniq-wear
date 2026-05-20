@@ -14,6 +14,7 @@ const productDetailsSchema = new mongoose.Schema({
   gallery: [{ url: String, altText: String }] 
 });
 
+// t6: statics (metoda statyczna)
 productDetailsSchema.statics.findByProductId = function(pid) {
   return this.findOne({ productId: pid });
 };

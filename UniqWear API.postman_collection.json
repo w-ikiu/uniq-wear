@@ -19,7 +19,7 @@
                 "method": "GET",
                 "header": [],
                 "url": {
-                  "raw": "http://localhost:3000/catalog/products?category=sneakers&minPrice=100",
+                  "raw": "http://localhost:3000/catalog/api/products?category=sneakers&minPrice=100",
                   "protocol": "http",
                   "host": [
                     "localhost"
@@ -27,6 +27,7 @@
                   "port": "3000",
                   "path": [
                     "catalog",
+                    "api",
                     "products"
                   ],
                   "query": [
@@ -50,7 +51,7 @@
                 "method": "GET",
                 "header": [],
                 "url": {
-                  "raw": "http://localhost:3000/catalog/products/1",
+                  "raw": "http://localhost:3000/catalog/api/products/1",
                   "protocol": "http",
                   "host": [
                     "localhost"
@@ -58,6 +59,7 @@
                   "port": "3000",
                   "path": [
                     "catalog",
+                    "api",
                     "products",
                     "1"
                   ]
@@ -96,7 +98,7 @@
                 "method": "GET",
                 "header": [],
                 "url": {
-                  "raw": "http://localhost:3000/catalog/stats/inventory?minStock=0",
+                  "raw": "http://localhost:3000/catalog/api/stats/inventory?minStock=0",
                   "protocol": "http",
                   "host": [
                     "localhost"
@@ -104,6 +106,7 @@
                   "port": "3000",
                   "path": [
                     "catalog",
+                    "api",
                     "stats",
                     "inventory"
                   ],
@@ -530,7 +533,7 @@
                 "header": [],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"items\": [\n    {\n      \"sku\": \"AM1-BLU-42\",\n      \"quantity\": 1\n    }\n  ]\n}",
+                  "raw": "{\n  \"items\": [\n    {\n      \"sku\": \"AM1-BLU-42\",\n      \"quantity\": 1\n    }\n  ],\n  \"userId\": 1,\n  \"cartId\": 1\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -538,7 +541,7 @@
                   }
                 },
                 "url": {
-                  "raw": "http://localhost:3000/checkout/checkout",
+                  "raw": "http://localhost:3000/checkout/api/checkout",
                   "protocol": "http",
                   "host": [
                     "localhost"
@@ -546,6 +549,7 @@
                   "port": "3000",
                   "path": [
                     "checkout",
+                    "api",
                     "checkout"
                   ]
                 },
@@ -568,7 +572,7 @@
                   }
                 },
                 "url": {
-                  "raw": "http://localhost:3000/checkout/checkout",
+                  "raw": "http://localhost:3000/checkout/api/checkout",
                   "protocol": "http",
                   "host": [
                     "localhost"
@@ -576,6 +580,7 @@
                   "port": "3000",
                   "path": [
                     "checkout",
+                    "api",
                     "checkout"
                   ]
                 },
@@ -589,7 +594,7 @@
                 "method": "GET",
                 "header": [],
                 "url": {
-                  "raw": "http://localhost:3000/checkout/orders",
+                  "raw": "http://localhost:3000/checkout/api/orders",
                   "protocol": "http",
                   "host": [
                     "localhost"
@@ -597,6 +602,7 @@
                   "port": "3000",
                   "path": [
                     "checkout",
+                    "api",
                     "orders"
                   ]
                 },
@@ -610,7 +616,7 @@
                 "method": "POST",
                 "header": [],
                 "url": {
-                  "raw": "http://localhost:3000/checkout/orders/1/cancel",
+                  "raw": "http://localhost:3000/checkout/api/orders/1/cancel",
                   "protocol": "http",
                   "host": [
                     "localhost"
@@ -618,6 +624,7 @@
                   "port": "3000",
                   "path": [
                     "checkout",
+                    "api",
                     "orders",
                     "1",
                     "cancel"
