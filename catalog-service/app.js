@@ -347,7 +347,7 @@ app.get('/api/cart-draft/:cartId', async (req, res) => {
 
 // t8c: architektura hybrydowa - zapis do pg i mongo z kompensacja
 app.post('/api/products/hybrid', async (req, res) => {
-  const { name, description, categoryId, price, sku, longDescription } = req.body;
+  const { name, description, categoryId, price, sku, longDescription, stock } = req.body;
   let createdProductPg;
 
   try {
@@ -358,7 +358,7 @@ app.post('/api/products/hybrid', async (req, res) => {
         description,
         categoryId: parseInt(categoryId),
         variants: {
-          create: { sku, price: parseFloat(price), stock: 0 }
+          create: { sku, price: parseFloat(price), stock: parseInt(stock) || 0 }
         }
       }
     });

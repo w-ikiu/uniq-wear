@@ -210,7 +210,8 @@ Tworzy produkt w PostgreSQL (Prisma) i szczegóły w MongoDB. Kompensacja gdy Mo
   "categoryId": 1,
   "price": 499.99,
   "sku": "AF1-WHT-42",
-  "longDescription": "Kultowy model z białej skóry premium"
+  "longDescription": "Kultowy model z białej skóry premium",
+  "stock": 10
 }
 ```
 **201 Created:**

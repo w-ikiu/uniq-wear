@@ -22,7 +22,8 @@ describe('Catalog Service - testy integracyjne', () => {
           categoryId: categoryId,
           price: 199.99,
           sku: 'CAT-TEST-' + Date.now(),
-          longDescription: 'Dlugi opis testowy buta katalogowego'
+          longDescription: 'Dlugi opis testowy buta katalogowego',
+          stock: 10
         });
 
       expect(response.status).toBe(201);
