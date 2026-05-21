@@ -90,6 +90,16 @@ app.get('/api/products', async (req, res) => {
   }
 });
 
+// dodatkowe
+app.get('/api/brands', async (req, res) => {
+  try {
+    const brands = await knex('brands').select('*');
+    res.json(brands);
+  } catch (error) {
+    res.status(500).json({ error: 'blad serwera', code: 500, details: error.message });
+  }
+})
+
 // t4: crud przez prismaclient - pobieranie szczegolow z relacjami
 app.get('/api/products/:id', async (req, res) => {
   try {

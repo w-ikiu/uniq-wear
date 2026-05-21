@@ -27,6 +27,7 @@ model Product {
   reviewCount Int       @default(0)  // licznik zatwierdzonych recenzji
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+  brand       String?   
 }
 
 // model wariantu (np. konkretny rozmiar i kolor buta)
