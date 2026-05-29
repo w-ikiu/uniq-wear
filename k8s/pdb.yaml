@@ -1,0 +1,23 @@
+# minimalnie 1 replika catalog-service dostepna podczas aktualizacji lub prac klastra
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: catalog-pdb
+  namespace: uniqwear
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: catalog-service
+---
+# minimalnie 1 replika checkout-service dostepna podczas aktualizacji lub prac klastra
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: checkout-pdb
+  namespace: uniqwear
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: checkout-service
