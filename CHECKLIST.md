@@ -95,13 +95,16 @@ kind delete cluster --name uniqwear
 | Secret | uniqwear-secret | uniqwear |
 | StatefulSet | postgres | uniqwear |
 | StatefulSet | mongo | uniqwear |
+| StatefulSet | redis | uniqwear |
 | PVC | postgres-data-postgres-0 | uniqwear |
 | PVC | mongo-data-mongo-0 | uniqwear |
+| PVC | redis-data-redis-0 | uniqwear |
 | Deployment | catalog-service (2 repliki) | uniqwear |
 | Deployment | checkout-service (2 repliki) | uniqwear |
 | Deployment | gateway (1 replika) | uniqwear |
 | Service | postgres (headless) | uniqwear |
 | Service | mongo (headless) | uniqwear |
+| Service | redis (headless) | uniqwear |
 | Service | catalog-service (ClusterIP) | uniqwear |
 | Service | checkout-service (ClusterIP) | uniqwear |
 | Service | gateway (ClusterIP) | uniqwear |
