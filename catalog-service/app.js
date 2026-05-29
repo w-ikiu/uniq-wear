@@ -18,6 +18,27 @@ const prisma = new PrismaClient();
 
 app.use(express.json());
 
+app.get('/health', async (req, res) => {
+  const health = { status: 'ok', postgres: 'ok', mongo: 'ok' };
+  let statusCode = 200;
+
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+  } catch {
+    health.postgres = 'error';
+    health.status = 'degraded';
+    statusCode = 503;
+  }
+
+  if (mongoose.connection.readyState !== 1) {
+    health.mongo = 'error';
+    health.status = 'degraded';
+    statusCode = 503;
+  }
+
+  res.status(statusCode).json(health);
+});
+
 // t1: endpoint uzywajacy natywnego sterownika z parametryzacja zapytania
 app.get('/api/products/pg/:id', async (req, res) => {
   try {

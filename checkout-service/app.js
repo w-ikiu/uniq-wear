@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+const mongoose = require('mongoose');
 const { sequelize, Order, OrderLine, Cart, CartLine } = require('./models');
 const connectMongo = require('./config/mongo');
 const Review = require('./models/review');
@@ -9,6 +10,27 @@ app.use(express.json());
 
 // polaczenie z mongodb (mongoose) przy starcie serwisu
 connectMongo();
+
+app.get('/health', async (req, res) => {
+  const health = { status: 'ok', postgres: 'ok', mongo: 'ok' };
+  let statusCode = 200;
+
+  try {
+    await sequelize.authenticate();
+  } catch {
+    health.postgres = 'error';
+    health.status = 'degraded';
+    statusCode = 503;
+  }
+
+  if (mongoose.connection.readyState !== 1) {
+    health.mongo = 'error';
+    health.status = 'degraded';
+    statusCode = 503;
+  }
+
+  res.status(statusCode).json(health);
+});
 
 // wymog specyficzny: checkout z blokada oversell
 // t3: transakcja zarzadzana (sequelize.transaction)
@@ -68,7 +90,6 @@ app.post('/api/checkout', async (req, res) => {
     // krok 2: t8c hybryda - jesli podano cartId, zamknij szkic koszyka w mongodb
     if (cartId) {
       try {
-        const mongoose = require('mongoose');
         const db = mongoose.connection.db;
         await db.collection('cartdrafts').updateOne(
           { cartId: parseInt(cartId) },
