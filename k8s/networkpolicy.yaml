@@ -1,0 +1,86 @@
+---
+# postgres przyjmuje ruch tylko z catalog-service i checkout-service
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-policy
+  namespace: uniqwear
+spec:
+  podSelector:
+    matchLabels:
+      app: postgres
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: catalog-service
+    - podSelector:
+        matchLabels:
+          app: checkout-service
+    ports:
+    - protocol: TCP
+      port: 5432
+---
+# mongo przyjmuje ruch tylko z catalog-service i checkout-service
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mongo-policy
+  namespace: uniqwear
+spec:
+  podSelector:
+    matchLabels:
+      app: mongo
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: catalog-service
+    - podSelector:
+        matchLabels:
+          app: checkout-service
+    ports:
+    - protocol: TCP
+      port: 27017
+---
+# redis przyjmuje ruch tylko z catalog-service
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: redis-policy
+  namespace: uniqwear
+spec:
+  podSelector:
+    matchLabels:
+      app: redis
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: catalog-service
+    ports:
+    - protocol: TCP
+      port: 6379
+---
+# gateway przyjmuje ruch zewnetrzny przez ingress i odpowiada do serwisow
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gateway-policy
+  namespace: uniqwear
+spec:
+  podSelector:
+    matchLabels:
+      app: gateway
+  policyTypes:
+  - Ingress
+  ingress:
+  - ports:
+    - protocol: TCP
+      port: 3000
