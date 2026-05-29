@@ -191,3 +191,12 @@ jobs:
         kubectl rollout status deployment/catalog-service -n uniqwear --timeout=300s
         kubectl rollout status deployment/checkout-service -n uniqwear --timeout=300s
         kubectl rollout status deployment/gateway -n uniqwear --timeout=300s
+
+    - name: debug on failure
+      if: failure()
+      run: |
+        kubectl get pods -n uniqwear
+        kubectl describe pods -n uniqwear
+        kubectl logs -l app=catalog-service -n uniqwear --all-containers --tail=50 || true
+        kubectl logs -l app=checkout-service -n uniqwear --all-containers --tail=50 || true
+        kubectl logs -l app=postgres -n uniqwear --tail=20 || true

@@ -21,15 +21,22 @@ spec:
       initContainers:
       - name: migrate
         image: ghcr.io/w-ikiu/uniqwear-catalog:latest
+        imagePullPolicy: IfNotPresent
         command: ["sh", "-c"]
         args:
         - |
-          until nc -w1 postgres 5432 </dev/null 2>/dev/null; do
-            echo "waiting for postgres..."; sleep 3
-          done
+          node -e "
+            const net = require('net');
+            function check() {
+              const s = net.createConnection(5432, 'postgres');
+              s.on('connect', () => { console.log('postgres ready'); s.destroy(); process.exit(0); });
+              s.on('error', () => { console.log('waiting for postgres...'); setTimeout(check, 3000); });
+            }
+            check();
+          "
           npx prisma migrate deploy
           npx knex migrate:latest
-          npx knex seed:run
+          npx knex seed:run || true
         env:
         - name: DATABASE_URL
           valueFrom:
@@ -39,6 +46,7 @@ spec:
       containers:
       - name: catalog-service
         image: ghcr.io/w-ikiu/uniqwear-catalog:latest
+        imagePullPolicy: IfNotPresent
         command: ["node", "app.js"]
         ports:
         - containerPort: 3001
@@ -62,14 +70,14 @@ spec:
           httpGet:
             path: /health
             port: 3001
-          initialDelaySeconds: 15
+          initialDelaySeconds: 30
           periodSeconds: 10
-          failureThreshold: 3
+          failureThreshold: 5
         livenessProbe:
           httpGet:
             path: /health
             port: 3001
-          initialDelaySeconds: 60
+          initialDelaySeconds: 90
           periodSeconds: 15
           failureThreshold: 3
         resources:

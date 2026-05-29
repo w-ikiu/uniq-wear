@@ -21,12 +21,19 @@ spec:
       initContainers:
       - name: migrate
         image: ghcr.io/w-ikiu/uniqwear-checkout:latest
+        imagePullPolicy: IfNotPresent
         command: ["sh", "-c"]
         args:
         - |
-          until nc -w1 postgres 5432 </dev/null 2>/dev/null; do
-            echo "waiting for postgres..."; sleep 3
-          done
+          node -e "
+            const net = require('net');
+            function check() {
+              const s = net.createConnection(5432, 'postgres');
+              s.on('connect', () => { console.log('postgres ready'); s.destroy(); process.exit(0); });
+              s.on('error', () => { console.log('waiting for postgres...'); setTimeout(check, 3000); });
+            }
+            check();
+          "
           npx sequelize-cli db:migrate
         env:
         - name: DATABASE_URL
@@ -37,6 +44,7 @@ spec:
       containers:
       - name: checkout-service
         image: ghcr.io/w-ikiu/uniqwear-checkout:latest
+        imagePullPolicy: IfNotPresent
         command: ["node", "app.js"]
         ports:
         - containerPort: 3002
@@ -60,14 +68,14 @@ spec:
           httpGet:
             path: /health
             port: 3002
-          initialDelaySeconds: 15
+          initialDelaySeconds: 30
           periodSeconds: 10
-          failureThreshold: 3
+          failureThreshold: 5
         livenessProbe:
           httpGet:
             path: /health
             port: 3002
-          initialDelaySeconds: 60
+          initialDelaySeconds: 90
           periodSeconds: 15
           failureThreshold: 3
         resources:
