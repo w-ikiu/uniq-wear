@@ -17,6 +17,10 @@ spec:
     metadata:
       labels:
         app: checkout-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3002"
+        prometheus.io/path: "/metrics"
     spec:
       initContainers:
       - name: migrate
