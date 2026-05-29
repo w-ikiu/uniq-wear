@@ -109,6 +109,12 @@ kind delete cluster --name uniqwear
 | Service | checkout-service (ClusterIP) | uniqwear |
 | Service | gateway (ClusterIP) | uniqwear |
 | Ingress | uniqwear-ingress | uniqwear |
+| NetworkPolicy | postgres-policy | uniqwear |
+| NetworkPolicy | mongo-policy | uniqwear |
+| NetworkPolicy | redis-policy | uniqwear |
+| NetworkPolicy | gateway-policy | uniqwear |
+| PodDisruptionBudget | catalog-pdb | uniqwear |
+| PodDisruptionBudget | checkout-pdb | uniqwear |
 
 ---
 
@@ -261,6 +267,41 @@ kubectl exec -it redis-0 -n uniqwear -- redis-cli keys "products:*"
 # sprawdzenie wartosci TTL
 kubectl exec -it redis-0 -n uniqwear -- redis-cli ttl "products:{}"
 # (integer) 47
+```
+
+---
+
+## Observability - metryki Prometheus
+
+Kazdy serwis udostepnia `/metrics` w formacie Prometheus text. Pody maja adnotacje `prometheus.io/scrape: "true"` gotowe pod scrapowanie.
+
+```bash
+# metryki gateway
+curl http://localhost:3000/metrics
+
+# metryki catalog (przez port-forward bezposrednio na serwis)
+kubectl port-forward service/catalog-service 3001:3001 -n uniqwear &
+curl http://localhost:3001/metrics
+```
+
+Przykladowy wynik:
+
+```
+# HELP process_uptime_seconds process uptime
+# TYPE process_uptime_seconds gauge
+process_uptime_seconds 42.31
+# HELP process_memory_bytes resident memory
+# TYPE process_memory_bytes gauge
+process_memory_bytes 75694080
+# HELP http_requests_total total http requests
+# TYPE http_requests_total counter
+http_requests_total{method="GET",status="200"} 17
+http_requests_total{method="POST",status="201"} 3
+```
+
+```bash
+# sprawdzenie adnotacji prometheusa na podach
+kubectl get pods -n uniqwear -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.metadata.annotations.prometheus\.io/scrape}{"\n"}{end}'
 ```
 
 ---

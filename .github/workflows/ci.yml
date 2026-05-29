@@ -187,6 +187,8 @@ jobs:
         kubectl apply -f k8s/checkout-deployment.yaml
         kubectl apply -f k8s/gateway-deployment.yaml
         kubectl apply -f k8s/ingress.yaml
+        kubectl apply -f k8s/networkpolicy.yaml
+        kubectl apply -f k8s/pdb.yaml
 
     - name: check rollout status
       run: |
