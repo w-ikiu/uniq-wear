@@ -2,6 +2,7 @@ require('dotenv').config();
 
 const { query } = require('./db');
 const express = require('express');
+const redis = require('./redis-client');
 
 const { PrismaClient } = require('@prisma/client');
 
@@ -63,7 +64,18 @@ app.get('/api/products/pg/:id', async (req, res) => {
 
 // t2: endpoint z dynamicznym where bez sklejania stringow
 // wymog specyficzny: filtr po kategorii, cenie i dostepnosci
+// wyniki cachowane w redis przez 60 sekund
 app.get('/api/products', async (req, res) => {
+  const cacheKey = `products:${JSON.stringify(req.query)}`;
+
+  try {
+    const cached = await redis.get(cacheKey);
+    if (cached) {
+      res.setHeader('X-Cache', 'HIT');
+      return res.json(JSON.parse(cached));
+    }
+  } catch (_) {}
+
   try {
     const { category, minPrice, maxPrice, available } = req.query;
 
@@ -105,6 +117,12 @@ app.get('/api/products', async (req, res) => {
     }
 
     const products = await query;
+
+    try {
+      await redis.set(cacheKey, JSON.stringify(products), 'EX', 60);
+    } catch (_) {}
+
+    res.setHeader('X-Cache', 'MISS');
     res.json(products);
   } catch (error) {
     res.status(500).json({ error: 'blad serwera', code: 500, details: error.message });

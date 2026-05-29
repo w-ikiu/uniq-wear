@@ -66,6 +66,11 @@ spec:
             secretKeyRef:
               name: uniqwear-secret
               key: MONGO_URI
+        - name: REDIS_URL
+          valueFrom:
+            configMapKeyRef:
+              name: uniqwear-config
+              key: REDIS_URL
         readinessProbe:
           httpGet:
             path: /health

@@ -13,3 +13,4 @@ data:
   # adresy wewnetrzne - nazwy serwisow kubernetes (nie docker-compose)
   CATALOG_URL: "http://catalog-service:3001"
   CHECKOUT_URL: "http://checkout-service:3002"
+  REDIS_URL: "redis://redis:6379"

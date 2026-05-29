@@ -168,12 +168,14 @@ jobs:
         kubectl apply -f k8s/secret.yaml
         kubectl apply -f k8s/postgres-statefulset.yaml
         kubectl apply -f k8s/mongo-statefulset.yaml
+        kubectl apply -f k8s/redis-statefulset.yaml
         kubectl apply -f k8s/services.yaml
 
     - name: wait for databases
       run: |
         kubectl wait --for=condition=ready pod -l app=postgres -n uniqwear --timeout=120s
         kubectl wait --for=condition=ready pod -l app=mongo -n uniqwear --timeout=120s
+        kubectl wait --for=condition=ready pod -l app=redis -n uniqwear --timeout=60s
 
     - name: patch image tags and deploy apps
       run: |

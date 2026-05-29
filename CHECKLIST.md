@@ -238,6 +238,30 @@ curl -X POST http://localhost:3000/checkout/api/cart \
 
 ---
 
+## Cache Redis - dowod dzialania
+
+Redis cachuje odpowiedzi `GET /api/products` przez 60 sekund. Header `X-Cache` pokazuje czy odpowiedz pochodzi z cache.
+
+```bash
+# pierwsze zapytanie - MISS (pobiera z bazy, zapisuje do redis)
+curl -i http://localhost:3000/catalog/api/products 2>&1 | grep -E "X-Cache|HTTP"
+# X-Cache: MISS
+
+# drugie zapytanie - HIT (pobiera z redis)
+curl -i http://localhost:3000/catalog/api/products 2>&1 | grep -E "X-Cache|HTTP"
+# X-Cache: HIT
+
+# sprawdzenie kluczy w redis
+kubectl exec -it redis-0 -n uniqwear -- redis-cli keys "products:*"
+# 1) "products:{}"
+
+# sprawdzenie wartosci TTL
+kubectl exec -it redis-0 -n uniqwear -- redis-cli ttl "products:{}"
+# (integer) 47
+```
+
+---
+
 ## Weryfikacja rolling update
 
 ```bash
