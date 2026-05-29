@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: uniqwear-config
+  namespace: uniqwear
+data:
+  POSTGRES_USER: "uniqwear_user"
+  POSTGRES_DB: "uniqwear_db"
+  POSTGRES_PORT: "5432"
+  GATEWAY_PORT: "3000"
+  CATALOG_PORT: "3001"
+  CHECKOUT_PORT: "3002"
+  # adresy wewnetrzne - nazwy serwisow kubernetes (nie docker-compose)
+  CATALOG_URL: "http://catalog-service:3001"
+  CHECKOUT_URL: "http://checkout-service:3002"
