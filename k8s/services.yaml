@@ -1,0 +1,63 @@
+# headless service dla statefulset - bazy nie sa dostepne z zewnatrz klastra
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: uniqwear
+spec:
+  clusterIP: None
+  selector:
+    app: postgres
+  ports:
+  - port: 5432
+    targetPort: 5432
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo
+  namespace: uniqwear
+spec:
+  clusterIP: None
+  selector:
+    app: mongo
+  ports:
+  - port: 27017
+    targetPort: 27017
+---
+# serwisy aplikacji - ClusterIP, ruch zewnetrzny tylko przez Ingress
+apiVersion: v1
+kind: Service
+metadata:
+  name: catalog-service
+  namespace: uniqwear
+spec:
+  selector:
+    app: catalog-service
+  ports:
+  - port: 3001
+    targetPort: 3001
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: checkout-service
+  namespace: uniqwear
+spec:
+  selector:
+    app: checkout-service
+  ports:
+  - port: 3002
+    targetPort: 3002
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+  namespace: uniqwear
+spec:
+  selector:
+    app: gateway
+  ports:
+  - port: 3000
+    targetPort: 3000
