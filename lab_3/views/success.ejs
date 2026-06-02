@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<head><title>Sukces logowania</title></head>
+<body>
+    <h1>Sukces logowania! Zapytanie do API: <%= apiSuccess %></h1>
+    <p><strong>Dostawca:</strong> <%= provider %></p>
+    <p><strong>Dane z chronionego API:</strong> <%= data %></p>
+    <hr>
+    <p>Token JWT — skopiuj i sprawdź na <a href="https://jwt.io" target="_blank">jwt.io</a>:</p>
+    <textarea rows="6" cols="80"><%= token %></textarea>
+    <br><br>
+    <a href="/">Powrót</a>
+</body>
+</html>
