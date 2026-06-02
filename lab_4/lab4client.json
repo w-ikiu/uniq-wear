@@ -1,0 +1,8 @@
+{
+  "clientId": "lab4client",
+  "enabled": true,
+  "publicClient": false,
+  "serviceAccountsEnabled": true,
+  "standardFlowEnabled": false,
+  "directAccessGrantsEnabled": false
+}

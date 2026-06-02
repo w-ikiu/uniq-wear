@@ -21,7 +21,7 @@ const providers = {
     },
     okta: {
         clientId: '9ssUNN5tBijkDQ46LVFFYuCKkhJ7X4xQ',
-        clientSecret: 'NWUntqrAMpibG0EPQ-U6MYWalVbYqAlXwzodrPa5VByS1U-QSI',
+        clientSecret: '',
         authEndpoint: 'https://dev-5625qvgjlckar86k.us.auth0.com/authorize',
         tokenEndpoint: 'https://dev-5625qvgjlckar86k.us.auth0.com/oauth/token',
         redirectUrl: 'http://localhost:3010/myredirect',
