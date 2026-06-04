@@ -30,6 +30,7 @@ spec:
             configMapKeyRef:
               name: uniqwear-config
               key: POSTGRES_DB
+        # haslo z secret
         - name: POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -64,5 +65,6 @@ spec:
           allowPrivilegeEscalation: false
       volumes:
       - name: postgres-data
+        # pvc
         persistentVolumeClaim:
           claimName: postgres-data

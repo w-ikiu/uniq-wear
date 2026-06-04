@@ -1,14 +1,16 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: checkout-service
+  name: catalog-service
   namespace: uniqwear
 spec:
+# repliki
   replicas: 2
   selector:
     matchLabels:
-      app: checkout-service
+      app: catalog-service
   strategy:
+  # rolling update
     type: RollingUpdate
     rollingUpdate:
       maxUnavailable: 1
@@ -16,15 +18,16 @@ spec:
   template:
     metadata:
       labels:
-        app: checkout-service
+        app: catalog-service
       annotations:
         prometheus.io/scrape: "true"
-        prometheus.io/port: "3002"
+        prometheus.io/port: "3001"
         prometheus.io/path: "/metrics"
     spec:
+      # init container
       initContainers:
       - name: migrate
-        image: ghcr.io/w-ikiu/uniqwear-checkout:latest
+        image: ghcr.io/w-ikiu/uniqwear-catalog:latest
         imagePullPolicy: IfNotPresent
         command: ["sh", "-c"]
         args:
@@ -38,50 +41,60 @@ spec:
             }
             check();
           "
-          npx sequelize-cli db:migrate
+          npx prisma migrate deploy
+          npx knex migrate:latest
+          npx knex seed:run || true
         env:
         - name: DATABASE_URL
           valueFrom:
             secretKeyRef:
               name: uniqwear-secret
-              key: DATABASE_URL_CHECKOUT
+              key: DATABASE_URL_CATALOG
       containers:
-      - name: checkout-service
-        image: ghcr.io/w-ikiu/uniqwear-checkout:latest
+      - name: catalog-service
+        image: ghcr.io/w-ikiu/uniqwear-catalog:latest
         imagePullPolicy: IfNotPresent
         command: ["node", "app.js"]
         ports:
-        - containerPort: 3002
+        - containerPort: 3001
         env:
-        - name: CHECKOUT_PORT
+        - name: CATALOG_PORT
           valueFrom:
             configMapKeyRef:
               name: uniqwear-config
-              key: CHECKOUT_PORT
+              key: CATALOG_PORT
         - name: DATABASE_URL
           valueFrom:
             secretKeyRef:
               name: uniqwear-secret
-              key: DATABASE_URL_CHECKOUT
+              key: DATABASE_URL_CATALOG
         - name: MONGO_URI
           valueFrom:
             secretKeyRef:
               name: uniqwear-secret
               key: MONGO_URI
+        - name: REDIS_URL
+          valueFrom:
+            configMapKeyRef:
+              name: uniqwear-config
+              key: REDIS_URL
+        # readiness probe
         readinessProbe:
           httpGet:
             path: /health
-            port: 3002
+            port: 3001
           initialDelaySeconds: 30
           periodSeconds: 10
           failureThreshold: 5
+        # liveness probe
         livenessProbe:
           httpGet:
             path: /health
-            port: 3002
+            port: 3001
           initialDelaySeconds: 90
           periodSeconds: 15
           failureThreshold: 3
+        # resources
         resources:
           requests:
             memory: "256Mi"
@@ -89,7 +102,9 @@ spec:
           limits:
             memory: "512Mi"
             cpu: "500m"
+        # security context
         securityContext:
+          # non root
           runAsNonRoot: true
           runAsUser: 1000
           allowPrivilegeEscalation: false

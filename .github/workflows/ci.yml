@@ -169,14 +169,14 @@ jobs:
 
     - name: apply databases and services
       run: |
-        kubectl apply -f k8s/namespace.yaml
-        kubectl apply -f k8s/configmap.yaml
-        kubectl apply -f k8s/secret.yaml
-        kubectl apply -f k8s/pvc.yaml
-        kubectl apply -f k8s/postgres-statefulset.yaml
-        kubectl apply -f k8s/mongo-statefulset.yaml
-        kubectl apply -f k8s/redis-statefulset.yaml
-        kubectl apply -f k8s/services.yaml
+        kubectl apply -f k8s/base/namespace.yaml
+        kubectl apply -f k8s/base/configmap.yaml
+        kubectl apply -f k8s/base/secret.yaml
+        kubectl apply -f k8s/base/pvc.yaml
+        kubectl apply -f k8s/base/postgres-statefulset.yaml
+        kubectl apply -f k8s/base/mongo-statefulset.yaml
+        kubectl apply -f k8s/base/redis-statefulset.yaml
+        kubectl apply -f k8s/base/services.yaml
 
     - name: wait for databases
       run: |
@@ -187,9 +187,9 @@ jobs:
     - name: deploy apps with kustomize prod overlay
       run: |
         sed -i "s/:latest/:${{ github.sha }}/g" \
-          k8s/catalog-deployment.yaml \
-          k8s/checkout-deployment.yaml \
-          k8s/gateway-deployment.yaml
+          k8s/base/catalog-deployment.yaml \
+          k8s/base/checkout-deployment.yaml \
+          k8s/base/gateway-deployment.yaml
         kubectl apply -k k8s/overlays/prod/
 
     - name: check rollout status
