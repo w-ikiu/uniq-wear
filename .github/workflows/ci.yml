@@ -167,11 +167,12 @@ jobs:
         kind load docker-image mongo:7 --name uniqwear
         kind load docker-image redis:7-alpine --name uniqwear
 
-    - name: apply base manifests
+    - name: apply databases and services
       run: |
         kubectl apply -f k8s/namespace.yaml
         kubectl apply -f k8s/configmap.yaml
         kubectl apply -f k8s/secret.yaml
+        kubectl apply -f k8s/pvc.yaml
         kubectl apply -f k8s/postgres-statefulset.yaml
         kubectl apply -f k8s/mongo-statefulset.yaml
         kubectl apply -f k8s/redis-statefulset.yaml
@@ -183,18 +184,13 @@ jobs:
         kubectl wait --for=condition=ready pod -l app=mongo -n uniqwear --timeout=240s
         kubectl wait --for=condition=ready pod -l app=redis -n uniqwear --timeout=120s
 
-    - name: patch image tags and deploy apps
+    - name: deploy apps with kustomize prod overlay
       run: |
         sed -i "s/:latest/:${{ github.sha }}/g" \
           k8s/catalog-deployment.yaml \
           k8s/checkout-deployment.yaml \
           k8s/gateway-deployment.yaml
-        kubectl apply -f k8s/catalog-deployment.yaml
-        kubectl apply -f k8s/checkout-deployment.yaml
-        kubectl apply -f k8s/gateway-deployment.yaml
-        kubectl apply -f k8s/ingress.yaml
-        kubectl apply -f k8s/networkpolicy.yaml
-        kubectl apply -f k8s/pdb.yaml
+        kubectl apply -k k8s/overlays/prod/
 
     - name: check rollout status
       run: |

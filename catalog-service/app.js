@@ -458,8 +458,9 @@ app.post('/api/products/hybrid', async (req, res) => {
     } catch (mongoError) {
       // t8c: kompensacja - jesli mongo zawiedzie, usuwamy rekord z postgresa
       console.error('blad mongo, uruchamiam kompensacje w postgres...');
+      await prisma.variant.deleteMany({ where: { productId: createdProductPg.id } });
       await prisma.product.delete({ where: { id: createdProductPg.id } });
-      
+
       throw new Error('blad zapisu detali produktu, operacja wycofana.');
     }
 

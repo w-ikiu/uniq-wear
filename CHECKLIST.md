@@ -49,8 +49,10 @@ kind load docker-image ghcr.io/w-ikiu/uniqwear-gateway:latest --name uniqwear
 kubectl apply -f k8s/namespace.yaml
 kubectl apply -f k8s/configmap.yaml
 kubectl apply -f k8s/secret.yaml
+kubectl apply -f k8s/pvc.yaml
 kubectl apply -f k8s/postgres-statefulset.yaml
 kubectl apply -f k8s/mongo-statefulset.yaml
+kubectl apply -f k8s/redis-statefulset.yaml
 kubectl apply -f k8s/services.yaml
 
 # poczekaj na bazy
@@ -155,6 +157,7 @@ pod/checkout-service-6b8d7f5c3-p9wqs   1/1     Running   0          3m
 pod/gateway-5c7b9d4f2-x3kpl            1/1     Running   0          3m
 pod/mongo-0                            1/1     Running   0          5m
 pod/postgres-0                         1/1     Running   0          5m
+pod/redis-0                            1/1     Running   0          5m
 
 NAME                       TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)     AGE
 service/catalog-service    ClusterIP   10.96.45.12     <none>        3001/TCP    5m
@@ -162,6 +165,7 @@ service/checkout-service   ClusterIP   10.96.67.89     <none>        3002/TCP   
 service/gateway            ClusterIP   10.96.23.45     <none>        3000/TCP    5m
 service/mongo              ClusterIP   None            <none>        27017/TCP   5m
 service/postgres           ClusterIP   None            <none>        5432/TCP    5m
+service/redis              ClusterIP   None            <none>        6379/TCP    5m
 
 NAME                               READY   UP-TO-DATE   AVAILABLE   AGE
 deployment.apps/catalog-service    2/2     2            2           3m
@@ -171,6 +175,7 @@ deployment.apps/gateway            1/1     1            1           3m
 NAME                                        DESIRED   CURRENT   READY   AGE
 statefulset.apps/mongo                      1         1         1       5m
 statefulset.apps/postgres                   1         1         1       5m
+statefulset.apps/redis                      1         1         1       5m
 ```
 
 ---

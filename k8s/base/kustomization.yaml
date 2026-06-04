@@ -5,6 +5,7 @@ resources:
 - ../namespace.yaml
 - ../configmap.yaml
 - ../secret.yaml
+- ../pvc.yaml
 - ../postgres-statefulset.yaml
 - ../mongo-statefulset.yaml
 - ../redis-statefulset.yaml

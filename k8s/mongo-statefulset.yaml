@@ -32,9 +32,10 @@ spec:
             - --eval
             - "db.adminCommand('ping').ok"
             - --quiet
-          initialDelaySeconds: 15
-          periodSeconds: 5
+          initialDelaySeconds: 30
+          periodSeconds: 10
           failureThreshold: 5
+          timeoutSeconds: 10
         livenessProbe:
           exec:
             command:
@@ -42,9 +43,10 @@ spec:
             - --eval
             - "db.adminCommand('ping').ok"
             - --quiet
-          initialDelaySeconds: 30
-          periodSeconds: 10
-          failureThreshold: 3
+          initialDelaySeconds: 60
+          periodSeconds: 15
+          failureThreshold: 5
+          timeoutSeconds: 10
         resources:
           requests:
             memory: "256Mi"
@@ -56,11 +58,7 @@ spec:
           runAsNonRoot: true
           runAsUser: 999
           allowPrivilegeEscalation: false
-  volumeClaimTemplates:
-  - metadata:
-      name: mongo-data
-    spec:
-      accessModes: ["ReadWriteOnce"]
-      resources:
-        requests:
-          storage: 1Gi
+      volumes:
+      - name: mongo-data
+        persistentVolumeClaim:
+          claimName: mongo-data
