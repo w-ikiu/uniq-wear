@@ -62,7 +62,7 @@ kubectl get pvc -n uniqwear -o wide
 # 1. dodaj produkt
 curl -s -X POST http://localhost:3000/catalog/api/products/hybrid \
   -H "Content-Type: application/json" \
-  -d '{"name":"Test Trwałości","brand":"TestBrand","category_id":1,"base_price":99.99,"description":"test","variants":[{"sku":"TEST-001","size":"M","color":"red","stock":5}]}' | jq .
+  -d '{"name":"Air Max","description":"Buty sportowe","categoryId":1,"price":299.99,"sku":"AM-002","stock":50,"longDescription":"Klasyczne buty do biegania"}'
 
 # 2. usuń pod bazy
 kubectl delete pod postgres-0 -n uniqwear
@@ -71,7 +71,7 @@ kubectl delete pod postgres-0 -n uniqwear
 kubectl wait --for=condition=ready pod postgres-0 -n uniqwear --timeout=120s
 
 # 4. sprawdź że dane nadal są
-curl -s http://localhost:3000/catalog/api/products | jq .
+curl -s http://localhost:3000/catalog/api/products
 ```
 
 ---

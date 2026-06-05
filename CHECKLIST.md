@@ -276,6 +276,45 @@ kubectl exec -it redis-0 -n uniqwear -- redis-cli ttl "products:{}"
 
 ---
 
+## Worker - review-stats-worker (CronJob)
+
+Worker dziala jako Kubernetes CronJob co 5 minut. Laczy sie z MongoDB i loguje statystyki recenzji (ile pending/approved/rejected). Uzywa obrazu catalog-service (mongoose juz zainstalowany).
+
+```bash
+# sprawdz czy CronJob istnieje
+kubectl get cronjob -n uniqwear
+
+# uruchom worker recznie (nie czekaj 5 minut)
+kubectl create job review-stats-manual --from=cronjob/review-stats-worker -n uniqwear
+
+# poczekaj na zakonczenie
+kubectl wait --for=condition=complete job/review-stats-manual -n uniqwear --timeout=60s
+
+# sprawdz logi workera
+kubectl logs job/review-stats-manual -n uniqwear
+```
+
+Przykladowy wynik:
+
+```
+[worker] connecting to MongoDB...
+[worker] connected
+[worker] review stats (total: 1):
+  pending: 1
+[worker] 1 reviews awaiting approval
+[worker] done
+```
+
+```bash
+# lista jobow (historia uruchomien)
+kubectl get jobs -n uniqwear
+
+# posprzataj manualny job
+kubectl delete job review-stats-manual -n uniqwear
+```
+
+---
+
 ## Observability - metryki Prometheus
 
 Kazdy serwis udostepnia `/metrics` w formacie Prometheus text. Pody maja adnotacje `prometheus.io/scrape: "true"` gotowe pod scrapowanie.

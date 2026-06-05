@@ -47,7 +47,11 @@ app.get('/metrics', (req, res) => {
   res.send(out);
 });
 
-app.get('/health', async (req, res) => {
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok' });
+});
+
+app.get('/ready', async (req, res) => {
   const health = { status: 'ok', postgres: 'ok', mongo: 'ok' };
   let statusCode = 200;
 

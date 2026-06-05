@@ -55,10 +55,13 @@ app.use('/checkout', createProxyMiddleware({
   pathRewrite: { '^/checkout': '' }
 }));
 
-// health check samego gateway
 app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
+  res.json({ status: 'ok' });
+});
+
+app.get('/ready', (req, res) => {
+  res.json({
+    status: 'ok',
     services: {
       catalog: CATALOG_URL,
       checkout: CHECKOUT_URL

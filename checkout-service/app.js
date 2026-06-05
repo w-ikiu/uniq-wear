@@ -39,7 +39,11 @@ app.get('/metrics', (req, res) => {
 // polaczenie z mongodb (mongoose) przy starcie serwisu
 connectMongo();
 
-app.get('/health', async (req, res) => {
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok' });
+});
+
+app.get('/ready', async (req, res) => {
   const health = { status: 'ok', postgres: 'ok', mongo: 'ok' };
   let statusCode = 200;
 

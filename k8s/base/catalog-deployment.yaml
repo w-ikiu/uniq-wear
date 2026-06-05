@@ -41,7 +41,14 @@ spec:
             }
             check();
           "
-          npx prisma migrate deploy
+          PRISMA_OUT=$(npx prisma migrate deploy 2>&1)
+          echo "$PRISMA_OUT"
+          if echo "$PRISMA_OUT" | grep -q "P3005"; then
+            echo "schema not empty, syncing with db push..."
+            npx prisma db push --accept-data-loss --skip-generate
+          elif echo "$PRISMA_OUT" | grep -q "Error:"; then
+            exit 1
+          fi
           npx knex migrate:latest
           npx knex seed:run || true
         env:
@@ -50,6 +57,7 @@ spec:
             secretKeyRef:
               name: uniqwear-secret
               key: DATABASE_URL_CATALOG
+      # glowny kontener
       containers:
       - name: catalog-service
         image: ghcr.io/w-ikiu/uniqwear-catalog:latest
@@ -57,6 +65,7 @@ spec:
         command: ["node", "app.js"]
         ports:
         - containerPort: 3001
+        # zmienne srodowiskowe
         env:
         - name: CATALOG_PORT
           valueFrom:
@@ -78,15 +87,15 @@ spec:
             configMapKeyRef:
               name: uniqwear-config
               key: REDIS_URL
-        # readiness probe
+        # readiness probe - czy jest gotowy
         readinessProbe:
           httpGet:
-            path: /health
+            path: /ready
             port: 3001
           initialDelaySeconds: 30
           periodSeconds: 10
           failureThreshold: 5
-        # liveness probe
+        # liveness probe - czy "zyje"
         livenessProbe:
           httpGet:
             path: /health

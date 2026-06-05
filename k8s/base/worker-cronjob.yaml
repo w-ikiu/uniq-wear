@@ -1,0 +1,41 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: review-stats-worker
+  namespace: uniqwear
+spec:
+  # co 5 minut tworzy nowy job
+  schedule: "*/5 * * * *"
+  # historia trzech udanych uruchomien (ostatnich)
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          # restart jesli nie zadziala
+          restartPolicy: OnFailure
+          containers:
+          - name: review-worker
+            # reuzywa obrazu catalog serice z ghcr
+            image: ghcr.io/w-ikiu/uniqwear-catalog:latest
+            imagePullPolicy: IfNotPresent
+            command: ["node", "worker.js"]
+            # zmienne srodowiskowe
+            env:
+            - name: MONGO_URI
+              valueFrom:
+                secretKeyRef:
+                  name: uniqwear-secret
+                  key: MONGO_URI
+            resources:
+              requests:
+                memory: "64Mi"
+                cpu: "50m"
+              limits:
+                memory: "128Mi"
+                cpu: "100m"
+            securityContext:
+              runAsNonRoot: true
+              runAsUser: 1000
+              allowPrivilegeEscalation: false

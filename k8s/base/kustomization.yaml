@@ -16,3 +16,4 @@ resources:
 - ingress.yaml
 - networkpolicy.yaml
 - pdb.yaml
+- worker-cronjob.yaml
