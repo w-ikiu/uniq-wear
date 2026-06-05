@@ -2,4 +2,7 @@ node_modules/
 .env
 dist/
 coverage/
-.DS_Store
+.DS_StoreARCHITEKTURA.md
+KOMENDY.md
+NOTATKI.md
+OBRONA_NOTATKI.md

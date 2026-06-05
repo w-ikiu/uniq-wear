@@ -12,17 +12,17 @@
 Projekt musi mieć katalog `k8s/` lub Helm/Kustomize zawierający minimum: Namespace, Deployment, StatefulSet dla bazy, Service, Ingress, ConfigMap, Secret, PVC.
 
 **Jak to zrobiliśmy:**
-- `k8s/namespace.yaml` — **Namespace** `uniqwear`: wirtualna przestrzeń nazw w klastrze; wszystkie nasze zasoby żyją wewnątrz niej, odizolowane od innych projektów na tym samym klastrze
-- `k8s/configmap.yaml` — **ConfigMap** `uniqwear-config`: słownik klucz→wartość z niepoufną konfiguracją (adresy URL serwisów, nazwy baz, porty); wstrzykiwany do kontenerów jako zmienne środowiskowe — zmiana konfiguracji bez przebudowania obrazu Docker
-- `k8s/secret.yaml` — **Secret** `uniqwear-secret`: jak ConfigMap, ale dla danych wrażliwych (hasła, connection stringi); wartości zakodowane base64, Kubernetes traktuje je inaczej — można ograniczyć dostęp przez RBAC i nie są logowane
-- `k8s/postgres-statefulset.yaml` — **StatefulSet** dla PostgreSQL: typ workloadu dla aplikacji stanowych (bazy danych); w odróżnieniu od Deployment każdy pod ma stałą nazwę (`postgres-0`) i własny PVC — dane nie znikają po restarcie, kolejność uruchamiania jest deterministyczna
-- `k8s/mongo-statefulset.yaml` — **StatefulSet** dla MongoDB z volumeClaimTemplates (PVC 1Gi); ten sam powód co PostgreSQL — MongoDB musi pamiętać swoje dane między restartami
-- `k8s/redis-statefulset.yaml` — **StatefulSet** dla Redis z volumeClaimTemplates (PVC 256Mi) + Service w tym samym pliku
-- `k8s/services.yaml` — **Service**: stały adres DNS i IP wewnątrz klastra dla grupy podów; pody umierają i rodzą się z nowymi IP, Service zawsze wskazuje na żywe pody przez selektor labelek — bez tego serwisy nie mogłyby się wzajemnie odnaleźć
-- `k8s/catalog-deployment.yaml` — **Deployment** dla catalog-service: zarządza bezstanowymi podami aplikacji; pilnuje żeby zawsze działała zadana liczba replik, obsługuje rolling update i rollback
-- `k8s/checkout-deployment.yaml` — **Deployment** dla checkout-service (j.w.)
-- `k8s/gateway-deployment.yaml` — **Deployment** dla gateway (j.w.)
-- `k8s/ingress.yaml` — **Ingress** `uniqwear-ingress`: reguły routingu ruchu HTTP/HTTPS z zewnątrz klastra do serwisów wewnętrznych; działa jak odwrotny proxy — jeden punkt wejścia zamiast eksponowania każdego serwisu osobno; obsługuje też TLS termination
+- `k8s/base/namespace.yaml` — **Namespace** `uniqwear`: wirtualna przestrzeń nazw w klastrze; wszystkie nasze zasoby żyją wewnątrz niej, odizolowane od innych projektów na tym samym klastrze
+- `k8s/base/configmap.yaml` — **ConfigMap** `uniqwear-config`: słownik klucz→wartość z niepoufną konfiguracją (adresy URL serwisów, nazwy baz, porty); wstrzykiwany do kontenerów jako zmienne środowiskowe — zmiana konfiguracji bez przebudowania obrazu Docker
+- `k8s/base/secret.yaml` — **Secret** `uniqwear-secret`: jak ConfigMap, ale dla danych wrażliwych (hasła, connection stringi); wartości zakodowane base64, Kubernetes traktuje je inaczej — można ograniczyć dostęp przez RBAC i nie są logowane
+- `k8s/base/postgres-statefulset.yaml` — **StatefulSet** dla PostgreSQL: typ workloadu dla aplikacji stanowych (bazy danych); w odróżnieniu od Deployment każdy pod ma stałą nazwę (`postgres-0`) i własny PVC — dane nie znikają po restarcie, kolejność uruchamiania jest deterministyczna
+- `k8s/base/mongo-statefulset.yaml` — **StatefulSet** dla MongoDB z volumeClaimTemplates (PVC 1Gi); ten sam powód co PostgreSQL — MongoDB musi pamiętać swoje dane między restartami
+- `k8s/base/redis-statefulset.yaml` — **StatefulSet** dla Redis z volumeClaimTemplates (PVC 256Mi) + Service w tym samym pliku
+- `k8s/base/services.yaml` — **Service**: stały adres DNS i IP wewnątrz klastra dla grupy podów; pody umierają i rodzą się z nowymi IP, Service zawsze wskazuje na żywe pody przez selektor labelek — bez tego serwisy nie mogłyby się wzajemnie odnaleźć
+- `k8s/base/catalog-deployment.yaml` — **Deployment** dla catalog-service: zarządza bezstanowymi podami aplikacji; pilnuje żeby zawsze działała zadana liczba replik, obsługuje rolling update i rollback
+- `k8s/base/checkout-deployment.yaml` — **Deployment** dla checkout-service (j.w.)
+- `k8s/base/gateway-deployment.yaml` — **Deployment** dla gateway (j.w.)
+- `k8s/base/ingress.yaml` — **Ingress** `uniqwear-ingress`: reguły routingu ruchu HTTP/HTTPS z zewnątrz klastra do serwisów wewnętrznych; działa jak odwrotny proxy — jeden punkt wejścia zamiast eksponowania każdego serwisu osobno; obsługuje też TLS termination
 - `k8s/base/kustomization.yaml` + `k8s/overlays/dev/` + `k8s/overlays/prod/` — Kustomize
 
 **Dlaczego tak:**
@@ -112,7 +112,7 @@ Każdy główny kontener musi mieć readinessProbe, livenessProbe oraz resources
 **Jak to zrobiliśmy:**
 
 Kontenery aplikacyjne (catalog, checkout, gateway):
-- `readinessProbe` httpGet na `/health`: initialDelaySeconds: 30, periodSeconds: 10, failureThreshold: 5
+- `readinessProbe` httpGet na `/ready`: initialDelaySeconds: 30, periodSeconds: 10, failureThreshold: 5
 - `livenessProbe` httpGet na `/health`: initialDelaySeconds: 90, periodSeconds: 15, failureThreshold: 3
 - resources catalog/checkout: requests 256Mi/100m, limits 512Mi/500m
 - resources gateway: requests 64Mi/50m, limits 128Mi/200m
@@ -238,7 +238,7 @@ Parametryzacja manifestów dla minimum dwóch środowisk.
 **Jak to zrobiliśmy:**
 - `k8s/base/kustomization.yaml` — lista wszystkich manifestów jako wspólna baza
 - `k8s/overlays/dev/kustomization.yaml` — patch: repliki 1 (tańsze środowisko deweloperskie)
-- `k8s/overlays/prod/kustomization.yaml` — patch: repliki 3 dla catalog, checkout i gateway
+- `k8s/overlays/prod/kustomization.yaml` — patch: repliki 3 dla catalog i checkout, 2 dla gateway
 
 Użycie:
 ```bash

@@ -12,14 +12,17 @@ spec:
   jobTemplate:
     spec:
       template:
+        metadata:
+          labels:
+            app: review-worker
         spec:
           # restart jesli nie zadziala
           restartPolicy: OnFailure
           containers:
           - name: review-worker
-            # reuzywa obrazu catalog serice z ghcr
+            # reuzywa obraz catalog serice z ghcr
             image: ghcr.io/w-ikiu/uniqwear-catalog:latest
-            imagePullPolicy: IfNotPresent
+            imagePullPolicy: Always
             command: ["node", "worker.js"]
             # zmienne srodowiskowe
             env:

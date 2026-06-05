@@ -23,7 +23,7 @@ spec:
     - protocol: TCP
       port: 5432
 ---
-# mongo przyjmuje ruch tylko z catalog-service i checkout-service
+# mongo przyjmuje ruch tylko z catalog-service, checkout-service i review-worker
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -43,6 +43,9 @@ spec:
     - podSelector:
         matchLabels:
           app: checkout-service
+    - podSelector:
+        matchLabels:
+          app: review-worker
     ports:
     - protocol: TCP
       port: 27017
