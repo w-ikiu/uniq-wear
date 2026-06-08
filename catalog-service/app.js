@@ -113,8 +113,12 @@ app.get('/api/products', async (req, res) => {
 
     // budowanie dynamicznego zapytania knex
     const query = knex('Product')
-      .select('Product.*', 'Category.name as categoryName')
-      .join('Category', 'Product.categoryId', 'Category.id');
+      .select('Product.*', 'Category.name as categoryName', 'prices.minPrice')
+      .join('Category', 'Product.categoryId', 'Category.id')
+      .leftJoin(
+        knex.raw(`(SELECT "productId", MIN("price")::float as "minPrice" FROM "Variant" GROUP BY "productId") as prices`),
+        'prices.productId', 'Product.id'
+      );
 
     if (category) {
       query.where('Category.name', category);
@@ -250,7 +254,7 @@ app.get('/api/products/details/search', async (req, res) => {
   }
 });
 
-// t5: trzeci operator mongodb - $in (pobieranie szczegolów wielu produktów naraz)
+// t5: trzeci operator mongodb - $in (pobieranie szczegolow wielu produktow naraz)
 app.get('/api/products/details', async (req, res) => {
   try {
     const db = await connectToMongo();
@@ -399,7 +403,7 @@ app.post('/api/cart-draft', async (req, res) => {
   }
 });
 
-// t6: populate() - pobierz szkic koszyka z pelnym dokumentem szczegolów produktu
+// t6: populate() - pobierz szkic koszyka z pelnym dokumentem szczegolow produktu
 // populate zastepuje samo id produktu pelnym dokumentem z kolekcji ProductDetails
 app.get('/api/cart-draft/:cartId', async (req, res) => {
   try {
