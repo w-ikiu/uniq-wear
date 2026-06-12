@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ChevronRight, ShoppingBag, MapPin, User, Mail, Phone, Lock } from 'lucide-react'
+import { ChevronRight, ShoppingBag, MapPin, User, Mail, Phone, Lock, LogIn } from 'lucide-react'
 import { useCart } from '../CartContext'
+import { useKeycloak } from '../KeycloakContext'
 import { api } from '../api'
 import ProductPlaceholder from '../components/ProductPlaceholder'
 
 export default function CheckoutPage() {
   const { items, total, clearCart } = useCart()
+  const { authenticated, ready, user, keycloak } = useKeycloak()
   const navigate = useNavigate()
   const [form, setForm] = useState({ name: '', email: '', phone: '', street: '', city: '', zip: '' })
   const [errors, setErrors] = useState({})
@@ -36,7 +38,11 @@ export default function CheckoutPage() {
     if (Object.keys(errs).length) { setErrors(errs); return }
     setLoading(true); setServerError('')
     try {
-      const result = await api.checkout({ items: items.map(i => ({ sku: i.sku, quantity: i.quantity })) })
+      // przekazujemy userId zeby zamowienie bylo przypisane do zalogowanego uzytkownika
+      const result = await api.checkout({
+        items: items.map(i => ({ sku: i.sku, quantity: i.quantity })),
+        userId: user?.id || null,
+      })
       clearCart()
       navigate(`/order-success?orderId=${result.order?.id || 'OK'}`)
     } catch (err) {
@@ -51,6 +57,28 @@ export default function CheckoutPage() {
       <ShoppingBag className="w-8 h-8 mx-auto mb-4" style={{ color: '#FF2D78' }} />
       <p className="font-display text-sm uppercase tracking-widest mb-6" style={{ color: '#FF2D78' }}>KOSZYK PUSTY</p>
       <Link to="/products" className="btn-primary text-xs">DO KOLEKCJI</Link>
+    </div>
+  )
+
+  // checkout wymaga zalogowania — gateway blokuje niezalogowanych uzytkownikow (401)
+  if (ready && !authenticated) return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 text-center">
+      <div
+        className="inline-flex flex-col items-center gap-6 p-10 rounded-3xl"
+        style={{ background: '#0f0f0f', border: '1px solid rgba(255,45,120,0.2)' }}
+      >
+        <Lock className="w-8 h-8" style={{ color: '#FF2D78' }} />
+        <div>
+          <p className="font-display text-sm uppercase tracking-widest text-white mb-2">WYMAGANE LOGOWANIE</p>
+          <p className="text-xs text-zinc-500 font-body">Zaloguj się żeby złożyć zamówienie</p>
+        </div>
+        <button
+          onClick={() => keycloak.login()}
+          className="btn-primary inline-flex items-center gap-2 text-xs"
+        >
+          <LogIn className="w-4 h-4" /> ZALOGUJ SIĘ
+        </button>
+      </div>
     </div>
   )
 

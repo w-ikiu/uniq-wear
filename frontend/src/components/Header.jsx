@@ -203,6 +203,42 @@ export default function Header() {
                 {label}
               </NavLink>
             ))}
+            {isAdmin && (
+              <NavLink
+                to="/admin"
+                onClick={() => setMenuOpen(false)}
+                className={({ isActive }) =>
+                  `block px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-widest font-body transition-colors flex items-center gap-2 ${
+                    isActive ? 'text-[#CCFF00] bg-[rgba(204,255,0,0.08)]' : 'text-zinc-400'
+                  }`
+                }
+              >
+                <Shield className="w-3 h-3" /> ADMIN
+              </NavLink>
+            )}
+            {/* login / logout w menu mobilnym */}
+            <div className="pt-2 mt-2" style={{ borderTop: '1px solid rgba(255,45,120,0.1)' }}>
+              {ready && (authenticated ? (
+                <div className="flex items-center justify-between px-4 py-2">
+                  <span className="text-[10px] text-zinc-500 font-body uppercase">{user?.name}</span>
+                  <button
+                    onClick={() => { keycloak.logout({ redirectUri: window.location.origin }); setMenuOpen(false) }}
+                    className="text-xs font-bold font-body uppercase tracking-widest flex items-center gap-1.5"
+                    style={{ color: '#FF2D78' }}
+                  >
+                    <LogOut className="w-3.5 h-3.5" /> Wyloguj
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => { keycloak.login(); setMenuOpen(false) }}
+                  className="w-full px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-widest font-body text-left flex items-center gap-2"
+                  style={{ color: '#FF2D78' }}
+                >
+                  <LogIn className="w-3.5 h-3.5" /> ZALOGUJ SIĘ
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>
