@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const { createProxyMiddleware } = require('http-proxy-middleware');
+const { authMiddleware } = require('./auth');
 
 const app = express();
 
@@ -11,6 +12,10 @@ app.use((req, res, next) => {
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
 });
+
+// walidacja jwt — sprawdza token przed przekazaniem zadania do serwisow
+// sciezki publiczne (GET produktow, kategorie, zdrowie) sa przepuszczane bez tokenu
+app.use(authMiddleware);
 
 const httpRequestsTotal = {};
 

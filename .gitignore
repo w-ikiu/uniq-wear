@@ -2,7 +2,12 @@ node_modules/
 .env
 dist/
 coverage/
-.DS_StoreARCHITEKTURA.md
+.DS_Store
+.claude/
+ARCHITEKTURA.md
+BEZPIECZENSTWO.md
 KOMENDY.md
 NOTATKI.md
 OBRONA_NOTATKI.md
+CHECKLIST.md
+NOTATKI_CHMUROWE.md
