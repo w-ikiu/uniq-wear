@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <title>Błąd — UniqWear SSR</title>
+  <style>
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0a0a0a; color: #e4e4e7; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center }
+    .box { background: #111; border: 1px solid rgba(255,45,120,.2); border-radius: 16px; padding: 2.5rem; max-width: 480px; text-align: center }
+    .icon { font-size: 2rem; margin-bottom: 1rem }
+    h1 { font-size: .7rem; text-transform: uppercase; letter-spacing: .2em; color: #FF2D78; margin-bottom: .75rem }
+    p { font-size: .8rem; color: #71717a; line-height: 1.6 }
+    a { display: inline-block; margin-top: 1.5rem; font-size: .65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .15em; padding: .5rem 1rem; border-radius: 8px; border: 1px solid rgba(255,45,120,.3); color: #FF2D78 }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <div class="icon">✗</div>
+    <h1>Błąd</h1>
+    <p><%= message %></p>
+    <% if (user) { %>
+      <a href="/logout">Wyloguj się</a>
+    <% } else { %>
+      <a href="/login">Zaloguj się</a>
+    <% } %>
+  </div>
+</body>
+</html>

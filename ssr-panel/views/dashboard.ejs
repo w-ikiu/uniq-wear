@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UniqWear — Panel Admina (SSR)</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0 }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0a0a0a; color: #e4e4e7; min-height: 100vh }
+    a { color: inherit; text-decoration: none }
+
+    .header {
+      background: #111; border-bottom: 1px solid rgba(255,45,120,.2);
+      padding: 0 2rem; display: flex; align-items: center; justify-content: space-between; height: 56px;
+    }
+    .logo { font-weight: 900; font-size: .85rem; letter-spacing: .15em; text-transform: uppercase }
+    .logo span { color: #FF2D78 }
+    .badge {
+      font-size: .6rem; font-weight: 700; text-transform: uppercase; letter-spacing: .15em;
+      padding: .2rem .5rem; border-radius: 999px;
+      background: rgba(204,255,0,.1); color: #CCFF00; border: 1px solid rgba(204,255,0,.3);
+    }
+    .user-bar { display: flex; align-items: center; gap: .75rem; font-size: .75rem; color: #71717a }
+    .btn-logout {
+      font-size: .65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .1em;
+      padding: .35rem .75rem; border-radius: 8px; cursor: pointer;
+      border: 1px solid rgba(255,45,120,.3); color: #FF2D78; background: transparent;
+    }
+    .btn-logout:hover { background: rgba(255,45,120,.08) }
+
+    .main { max-width: 1200px; margin: 0 auto; padding: 2rem 1.5rem }
+    .page-title {
+      font-size: 1.25rem; font-weight: 900; text-transform: uppercase; letter-spacing: -.01em;
+      margin-bottom: 1.5rem; display: flex; align-items: center; gap: .5rem;
+    }
+    .page-title::before { content: '✦'; color: #CCFF00; font-size: .8rem }
+
+    /* nota ze to jest SSR */
+    .ssr-note {
+      margin-bottom: 1.5rem; padding: .6rem 1rem; border-radius: 10px; font-size: .7rem;
+      background: rgba(204,255,0,.05); color: #a3a3a3; border: 1px solid rgba(204,255,0,.15);
+    }
+    .ssr-note strong { color: #CCFF00 }
+
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.25rem }
+
+    .card {
+      background: #111; border: 1px solid rgba(255,255,255,.06); border-radius: 16px; padding: 1.25rem;
+    }
+    .card-title {
+      font-size: .65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .2em;
+      color: #CCFF00; margin-bottom: 1rem; display: flex; align-items: center; gap: .4rem;
+    }
+    .card-title .count {
+      background: rgba(255,45,120,.1); color: #FF2D78; border: 1px solid rgba(255,45,120,.2);
+      padding: .1rem .4rem; border-radius: 999px; font-size: .6rem;
+    }
+
+    table { width: 100%; border-collapse: collapse; font-size: .72rem }
+    th { text-align: left; font-size: .6rem; text-transform: uppercase; letter-spacing: .15em; color: #52525b; padding: .4rem .5rem; border-bottom: 1px solid rgba(255,255,255,.05) }
+    td { padding: .55rem .5rem; border-bottom: 1px solid rgba(255,255,255,.03); color: #a1a1aa }
+    tr:last-child td { border-bottom: none }
+    .mono { font-family: monospace; color: #e4e4e7 }
+
+    .status {
+      display: inline-block; padding: .15rem .5rem; border-radius: 999px;
+      font-size: .6rem; font-weight: 700; text-transform: uppercase; letter-spacing: .1em;
+    }
+    .status-paid      { background: rgba(204,255,0,.08); color: #CCFF00; border: 1px solid rgba(204,255,0,.2) }
+    .status-cancelled { background: rgba(255,45,120,.08); color: #FF2D78; border: 1px solid rgba(255,45,120,.2) }
+    .status-pending   { background: rgba(255,255,255,.05); color: #71717a; border: 1px solid rgba(255,255,255,.1) }
+
+    .stars { color: #FF2D78; letter-spacing: .05em }
+
+    .btn-approve {
+      font-size: .6rem; font-weight: 700; text-transform: uppercase; letter-spacing: .1em;
+      padding: .25rem .6rem; border-radius: 6px; cursor: pointer;
+      background: rgba(204,255,0,.08); color: #CCFF00; border: 1px solid rgba(204,255,0,.25);
+    }
+    .btn-approve:hover { background: rgba(204,255,0,.15) }
+
+    .empty { font-size: .72rem; color: #3f3f46; padding: 1rem 0; text-align: center }
+
+    .stat-row { display: flex; justify-content: space-between; align-items: center; padding: .5rem 0; border-bottom: 1px solid rgba(255,255,255,.04) }
+    .stat-row:last-child { border-bottom: none }
+    .stat-label { font-size: .65rem; color: #71717a; text-transform: uppercase; letter-spacing: .1em }
+    .stat-val   { font-size: .85rem; font-weight: 700; color: #CCFF00 }
+    .rating-val { font-size: .85rem; font-weight: 700; color: #FF2D78 }
+  </style>
+</head>
+<body>
+
+<header class="header">
+  <div class="logo">UNIQ<span>WEAR</span> &nbsp;<span class="badge">SSR ADMIN</span></div>
+  <div class="user-bar">
+    <span><%= user.name %></span>
+    <span class="badge">ADMIN</span>
+    <a href="/logout"><button class="btn-logout">Wyloguj</button></a>
+  </div>
+</header>
+
+<main class="main">
+  <h1 class="page-title">Panel Administracyjny</h1>
+
+  <div class="ssr-note">
+    <strong>Strona renderowana server-side.</strong>
+    Token dostępu jest przechowywany w sesji serwerowej (Express Session) — nie trafia do przeglądarki.
+    Flow: Authorization Code (Keycloak) → wymiana kodu na token → sesja po stronie serwera.
+  </div>
+
+  <div class="grid">
+
+    <!-- oczekujace recenzje -->
+    <div class="card">
+      <div class="card-title">
+        Recenzje oczekujące <span class="count"><%= reviews.length %></span>
+      </div>
+      <% if (reviews.length === 0) { %>
+        <p class="empty">Brak oczekujacych recenzji</p>
+      <% } else { %>
+        <table>
+          <thead><tr><th>Produkt</th><th>Ocena</th><th>Tytuł</th><th></th></tr></thead>
+          <tbody>
+            <% reviews.forEach(r => { %>
+            <tr>
+              <td>#<%= r.productId %></td>
+              <td><span class="stars"><%= '★'.repeat(r.rating) %><%= '☆'.repeat(5 - r.rating) %></span></td>
+              <td><%= r.title || '—' %></td>
+              <td>
+                <form method="POST" action="/reviews/<%= r._id %>/approve" style="display:inline">
+                  <button class="btn-approve">✓ Zatwierdź</button>
+                </form>
+              </td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      <% } %>
+    </div>
+
+    <!-- ostatnie zamowienia -->
+    <div class="card">
+      <div class="card-title">
+        Zamówienia <span class="count"><%= orders.length %></span>
+      </div>
+      <% if (orders.length === 0) { %>
+        <p class="empty">Brak zamowien</p>
+      <% } else { %>
+        <table>
+          <thead><tr><th>ID</th><th>Status</th><th>Kwota</th><th>Data</th></tr></thead>
+          <tbody>
+            <% orders.forEach(o => { %>
+            <tr>
+              <td class="mono">#<%= o.id %></td>
+              <td><span class="status status-<%= o.status %>"><%= o.status %></span></td>
+              <td class="mono"><%= Number(o.totalAmount).toFixed(2) %> zł</td>
+              <td><%= new Date(o.createdAt).toLocaleDateString('pl-PL') %></td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      <% } %>
+    </div>
+
+    <!-- stany magazynowe -->
+    <div class="card">
+      <div class="card-title">Stany magazynowe</div>
+      <% if (stats.length === 0) { %>
+        <p class="empty">Brak danych</p>
+      <% } else { %>
+        <% stats.forEach(s => { %>
+          <div class="stat-row">
+            <span class="stat-label">Kategoria #<%= s.categoryId %></span>
+            <span class="stat-val"><%= s.totalStock %> szt.</span>
+          </div>
+        <% }) %>
+      <% } %>
+    </div>
+
+    <!-- analityki ocen mongodb -->
+    <div class="card">
+      <div class="card-title">Analityki ocen (MongoDB agregacja)</div>
+      <% if (analytics.length === 0) { %>
+        <p class="empty">Brak danych — zatwierdz recenzje</p>
+      <% } else { %>
+        <table>
+          <thead><tr><th>Produkt</th><th>Śr. ocena</th><th>Recenzji</th></tr></thead>
+          <tbody>
+            <% analytics.forEach(a => { %>
+            <tr>
+              <td>#<%= a.productId %></td>
+              <td><span class="rating-val">★ <%= a.averageRating %></span></td>
+              <td class="mono"><%= a.reviewCount %></td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      <% } %>
+    </div>
+
+  </div>
+</main>
+
+</body>
+</html>
