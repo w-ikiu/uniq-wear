@@ -29,7 +29,7 @@ export default function OrdersPage() {
   function fetchOrders() {
     setLoading(true)
     setError('')
-    api.getOrders(user?.id)
+    api.getOrders()
       .then(setOrders)
       .catch(() => setError('nie udalo sie pobrac zamowien'))
       .finally(() => setLoading(false))

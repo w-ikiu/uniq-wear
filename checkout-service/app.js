@@ -69,7 +69,9 @@ app.get('/ready', async (req, res) => {
 // t3: blokada FOR UPDATE zapobiega wyscigom przy rownoczesnych zamowieniach
 // regula biznesowa: snapshot ceny w order_lines (zmiana cennika nie wplywa na zlezone zamowienia)
 app.post('/api/checkout', async (req, res) => {
-  const { items, userId, cartId } = req.body;
+  const { items, cartId } = req.body;
+  // gateway ustawia x-user-id z jwt — uzytkownik nie moze podszyc sie pod innego
+  const userId = req.headers['x-user-id'] || null;
   let createdOrder;
   let savedLines;
 
@@ -160,11 +162,17 @@ app.post('/api/checkout', async (req, res) => {
 
 // wymog specyficzny: historia zamowien uzytkownika
 // t3: eager loading - OrderLine dolaczony do Order przez include
+// admin (x-user-roles zawiera 'admin') widzi wszystkie zamowienia
+// zwykly uzytkownik widzi tylko swoje (filtr po x-user-id z jwt)
 app.get('/api/orders', async (req, res) => {
   try {
+    const roles  = (req.headers['x-user-roles'] || '').split(',');
+    const userId = req.headers['x-user-id'] || null;
+    const isAdmin = roles.includes('admin');
+
     const where = {};
-    if (req.query.userId) {
-      where.userId = parseInt(req.query.userId);
+    if (!isAdmin && userId) {
+      where.userId = userId;
     }
 
     const orders = await Order.findAll({
@@ -174,10 +182,10 @@ app.get('/api/orders', async (req, res) => {
     });
     res.json(orders);
   } catch (error) {
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'blad pobierania historii zamowien',
       code: 500,
-      details: error.message 
+      details: error.message
     });
   }
 });

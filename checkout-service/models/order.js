@@ -19,8 +19,9 @@ module.exports = (sequelize, DataTypes) => {
       }
     },
     totalAmount: DataTypes.DECIMAL,
+    // uuid keycloaka (string) — gateway wstrzykuje przez naglowek x-user-id
     userId: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.STRING,
       allowNull: true
     }
   }, {

@@ -99,16 +99,17 @@ export const api = {
   },
 
   // zamowienia
-  checkout({ items, userId }) {
+  // userId nie jest przesylany — gateway wstrzykuje x-user-id z tokenu jwt
+  checkout({ items }) {
     return request(`${CHECKOUT}/checkout`, {
       method: 'POST',
-      body: JSON.stringify({ items, userId }),
+      body: JSON.stringify({ items }),
     })
   },
 
-  getOrders(userId) {
-    const qs = userId ? `?userId=${userId}` : ''
-    return request(`${CHECKOUT}/orders${qs}`)
+  // filtrowanie po uzytkowniku odbywa sie po stronie serwisu na podstawie naglowka x-user-id
+  getOrders() {
+    return request(`${CHECKOUT}/orders`)
   },
 
   cancelOrder(orderId) {

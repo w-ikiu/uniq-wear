@@ -38,10 +38,8 @@ export default function CheckoutPage() {
     if (Object.keys(errs).length) { setErrors(errs); return }
     setLoading(true); setServerError('')
     try {
-      // przekazujemy userId zeby zamowienie bylo przypisane do zalogowanego uzytkownika
       const result = await api.checkout({
         items: items.map(i => ({ sku: i.sku, quantity: i.quantity })),
-        userId: user?.id || null,
       })
       clearCart()
       navigate(`/order-success?orderId=${result.order?.id || 'OK'}`)
