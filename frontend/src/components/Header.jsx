@@ -1,14 +1,18 @@
 import { Link, NavLink, useNavigate } from 'react-router-dom'
-import { ShoppingBag, Menu, X, Search } from 'lucide-react'
+import { ShoppingBag, Menu, X, Search, LogIn, LogOut, Shield } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useCart } from '../CartContext'
+import { useKeycloak } from '../KeycloakContext'
 
 export default function Header() {
   const { itemCount, openDrawer } = useCart()
+  const { authenticated, user, keycloak, ready } = useKeycloak()
   const [menuOpen, setMenuOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [scrolled, setScrolled] = useState(false)
   const navigate = useNavigate()
+
+  const isAdmin = user?.roles?.includes('admin')
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20)
@@ -70,6 +74,19 @@ export default function Header() {
                 {label}
               </NavLink>
             ))}
+            {/* link do panelu admina widoczny tylko dla uzytkownikow z rola admin */}
+            {isAdmin && (
+              <NavLink
+                to="/admin"
+                className={({ isActive }) =>
+                  `px-4 py-2 rounded-lg text-xs font-semibold uppercase tracking-widest transition-all duration-150 font-body flex items-center gap-1.5 ${
+                    isActive ? 'text-[#CCFF00]' : 'text-zinc-400 hover:text-[#CCFF00]'
+                  }`
+                }
+              >
+                <Shield className="w-3 h-3" /> Admin
+              </NavLink>
+            )}
           </nav>
 
           {/* Actions */}
@@ -95,6 +112,41 @@ export default function Header() {
                 />
               </div>
             </form>
+
+            {/* login / logout — widoczne po zaladowaniu keycloaka */}
+            {ready && (
+              authenticated ? (
+                <div className="hidden md:flex items-center gap-2">
+                  <span className="text-[10px] text-zinc-500 font-body uppercase tracking-widest">
+                    {user?.name}
+                  </span>
+                  {isAdmin && (
+                    <span
+                      className="text-[9px] font-black font-body uppercase px-2 py-0.5 rounded-full"
+                      style={{ background: 'rgba(204,255,0,0.1)', color: '#CCFF00', border: '1px solid rgba(204,255,0,0.3)' }}
+                    >
+                      ADMIN
+                    </span>
+                  )}
+                  <button
+                    onClick={() => keycloak.logout({ redirectUri: window.location.origin })}
+                    className="p-2 rounded-xl text-zinc-500 hover:text-[#FF2D78] transition-colors"
+                    aria-label="Wyloguj"
+                    title="Wyloguj"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => keycloak.login()}
+                  className="hidden md:flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold font-body uppercase tracking-widest transition-all duration-150"
+                  style={{ border: '1px solid rgba(255,45,120,0.3)', color: '#FF2D78' }}
+                >
+                  <LogIn className="w-3.5 h-3.5" /> Zaloguj
+                </button>
+              )
+            )}
 
             {/* Cart */}
             <button

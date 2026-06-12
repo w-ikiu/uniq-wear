@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html>
+<head><title>Silent SSO</title></head>
+<body>
+<script>
+  // ten plik jest wymagany przez keycloak-js do cichego sprawdzenia sesji przez iframe
+  // bez niego check-sso nie dziala poprawnie
+  parent.postMessage(location.href, location.origin);
+</script>
+</body>
+</html>
