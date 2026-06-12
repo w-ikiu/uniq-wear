@@ -21,6 +21,7 @@ async function request(url, options = {}) {
 }
 
 export const api = {
+  // produkty
   getProducts(params = {}) {
     const clean = Object.fromEntries(
       Object.entries(params).filter(([, v]) => v !== undefined && v !== '' && v !== null)
@@ -33,6 +34,23 @@ export const api = {
     return request(`${CATALOG}/products/${id}`)
   },
 
+  // wymaga roli admin — tworzy produkt w postgres i mongodb jednoczesnie (hybrydowy zapis)
+  createProductHybrid({ name, description, categoryId, price, sku, longDescription, stock }) {
+    return request(`${CATALOG}/products/hybrid`, {
+      method: 'POST',
+      body: JSON.stringify({ name, description, categoryId, price, sku, longDescription, stock }),
+    })
+  },
+
+  // wyszukiwanie szczegolów produktow w mongodb (t5: operatory $text, $gte)
+  searchProductDetails(keyword, minWeight) {
+    const qs = new URLSearchParams()
+    if (keyword)   qs.set('keyword', keyword)
+    if (minWeight) qs.set('minWeight', minWeight)
+    return request(`${CATALOG}/products/details/search?${qs}`)
+  },
+
+  // kategorie
   getCategories() {
     return request(`${CATALOG}/categories`)
   },
@@ -45,8 +63,23 @@ export const api = {
     })
   },
 
+  // recenzje
   getReviews(productId) {
     return request(`${CHECKOUT}/reviews/${productId}`)
+  },
+
+  // pobiera wszystkie recenzje z opcjonalnym filtrem statusu — dla admina
+  getAllReviews(status) {
+    const qs = status ? `?status=${status}` : ''
+    return request(`${CATALOG}/reviews${qs}`)
+  },
+
+  // dodaje recenzje produktu — status pending, wymaga zatwierdzenia przez admina
+  submitReview({ productId, userId, rating, title, body }) {
+    return request(`${CATALOG}/reviews`, {
+      method: 'POST',
+      body: JSON.stringify({ productId, userId, rating, title, body, status: 'pending' }),
+    })
   },
 
   // wymaga roli admin
@@ -56,20 +89,31 @@ export const api = {
     })
   },
 
-  checkout(data) {
+  // analityki
+  getAnalyticsRatings() {
+    return request(`${CATALOG}/analytics/ratings`)
+  },
+
+  getInventoryStats() {
+    return request(`${CATALOG}/stats/inventory`)
+  },
+
+  // zamowienia
+  checkout({ items, userId }) {
     return request(`${CHECKOUT}/checkout`, {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify({ items, userId }),
     })
   },
 
-  // wymaga tokenu (dowolna rola)
   getOrders(userId) {
     const qs = userId ? `?userId=${userId}` : ''
     return request(`${CHECKOUT}/orders${qs}`)
   },
 
-  getInventoryStats() {
-    return request(`${CATALOG}/stats/inventory`)
+  cancelOrder(orderId) {
+    return request(`${CHECKOUT}/orders/${orderId}/cancel`, {
+      method: 'POST',
+    })
   },
 }

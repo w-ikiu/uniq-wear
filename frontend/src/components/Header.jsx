@@ -1,5 +1,5 @@
 import { Link, NavLink, useNavigate } from 'react-router-dom'
-import { ShoppingBag, Menu, X, Search, LogIn, LogOut, Shield } from 'lucide-react'
+import { ShoppingBag, Menu, X, Search, LogIn, LogOut, Shield, Package } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useCart } from '../CartContext'
 import { useKeycloak } from '../KeycloakContext'
@@ -74,6 +74,19 @@ export default function Header() {
                 {label}
               </NavLink>
             ))}
+            {/* link do zamowien widoczny tylko dla zalogowanych uzytkownikow */}
+            {authenticated && (
+              <NavLink
+                to="/orders"
+                className={({ isActive }) =>
+                  `px-4 py-2 rounded-lg text-xs font-semibold uppercase tracking-widest transition-all duration-150 font-body flex items-center gap-1.5 ${
+                    isActive ? 'text-[#FF2D78]' : 'text-zinc-400 hover:text-white'
+                  }`
+                }
+              >
+                <Package className="w-3 h-3" /> Zamówienia
+              </NavLink>
+            )}
             {/* link do panelu admina widoczny tylko dla uzytkownikow z rola admin */}
             {isAdmin && (
               <NavLink
@@ -203,6 +216,19 @@ export default function Header() {
                 {label}
               </NavLink>
             ))}
+            {authenticated && (
+              <NavLink
+                to="/orders"
+                onClick={() => setMenuOpen(false)}
+                className={({ isActive }) =>
+                  `block px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-widest font-body transition-colors flex items-center gap-2 ${
+                    isActive ? 'text-[#FF2D78] bg-[rgba(255,45,120,0.08)]' : 'text-zinc-400'
+                  }`
+                }
+              >
+                <Package className="w-3 h-3" /> MOJE ZAMÓWIENIA
+              </NavLink>
+            )}
             {isAdmin && (
               <NavLink
                 to="/admin"

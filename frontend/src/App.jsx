@@ -9,6 +9,7 @@ import ProductDetailPage from './pages/ProductDetailPage'
 import CheckoutPage from './pages/CheckoutPage'
 import OrderSuccessPage from './pages/OrderSuccessPage'
 import AdminPage from './pages/AdminPage'
+import OrdersPage from './pages/OrdersPage'
 
 export default function App() {
   return (
@@ -25,6 +26,7 @@ export default function App() {
               <Route path="/products/:id"  element={<ProductDetailPage />} />
               <Route path="/checkout"      element={<CheckoutPage />} />
               <Route path="/order-success" element={<OrderSuccessPage />} />
+              <Route path="/orders"        element={<OrdersPage />} />
               {/* trasa /admin dostepna dla wszystkich — sama strona sprawdza role */}
               <Route path="/admin"         element={<AdminPage />} />
             </Routes>

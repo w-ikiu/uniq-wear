@@ -283,6 +283,18 @@ app.get('/api/products/details', async (req, res) => {
   }
 });
 
+// lista wszystkich recenzji z opcjonalnym filtrem statusu — uzywana przez panel admina
+app.get('/api/reviews', async (req, res) => {
+  try {
+    const filter = {}
+    if (req.query.status) filter.status = req.query.status
+    const reviews = await Review.find(filter).sort({ createdAt: -1 }).limit(100)
+    res.json(reviews)
+  } catch (error) {
+    res.status(500).json({ error: error.message, code: 500, details: null })
+  }
+})
+
 // t6: endpoint do dodawania recenzji i testowania hookow (mongoose)
 app.post('/api/reviews', async (req, res) => {
   try {

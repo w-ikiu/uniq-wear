@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ShoppingBag, Star, ChevronRight, Check, Package } from 'lucide-react'
+import { ArrowLeft, ShoppingBag, Star, ChevronRight, Check, Package, Send } from 'lucide-react'
 import { api } from '../api'
 import { useCart } from '../CartContext'
+import { useKeycloak } from '../KeycloakContext'
 import ProductPlaceholder from '../components/ProductPlaceholder'
 
 function Stars({ rating, count }) {
@@ -28,6 +29,7 @@ export default function ProductDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { addItem, openDrawer } = useCart()
+  const { authenticated, user } = useKeycloak()
 
   const [product, setProduct] = useState(null)
   const [reviews, setReviews] = useState([])
@@ -35,6 +37,9 @@ export default function ProductDetailPage() {
   const [error, setError] = useState(null)
   const [selectedVariant, setSelectedVariant] = useState(null)
   const [added, setAdded] = useState(false)
+  const [reviewForm, setReviewForm] = useState({ rating: 5, title: '', body: '' })
+  const [reviewSent, setReviewSent] = useState(false)
+  const [reviewError, setReviewError] = useState('')
 
   useEffect(() => {
     setLoading(true); setError(null)
@@ -62,6 +67,24 @@ export default function ProductDetailPage() {
     setAdded(true)
     openDrawer()
     setTimeout(() => setAdded(false), 3000)
+  }
+
+  async function handleReviewSubmit(e) {
+    e.preventDefault()
+    setReviewError('')
+    try {
+      await api.submitReview({
+        productId: parseInt(id),
+        userId:    user?.id || null,
+        rating:    reviewForm.rating,
+        title:     reviewForm.title,
+        body:      reviewForm.body,
+      })
+      setReviewSent(true)
+      setReviewForm({ rating: 5, title: '', body: '' })
+    } catch (err) {
+      setReviewError(err.message)
+    }
   }
 
   const sizes  = product?.variants ? [...new Set(product.variants.filter(v => v.size).map(v => v.size))] : []
@@ -265,6 +288,69 @@ export default function ProductDetailPage() {
                 {r.body  && <p className="text-xs text-zinc-500 font-body leading-relaxed">{r.body}</p>}
               </div>
             ))}
+          </div>
+        )}
+
+        {/* formularz dodawania recenzji — widoczny tylko dla zalogowanych uzytkownikow */}
+        {authenticated && (
+          <div className="mt-8 rounded-2xl p-6" style={{ background: '#0f0f0f', border: '1px solid rgba(255,45,120,0.15)' }}>
+            <p className="text-[10px] font-bold uppercase tracking-[0.25em] font-body text-white mb-5">NAPISZ RECENZJĘ</p>
+
+            {reviewSent ? (
+              <div className="rounded-xl p-4 text-xs font-body" style={{ background: 'rgba(204,255,0,0.08)', color: '#CCFF00', border: '1px solid rgba(204,255,0,0.2)' }}>
+                Recenzja wysłana — czeka na zatwierdzenie przez admina.
+              </div>
+            ) : (
+              <form onSubmit={handleReviewSubmit} className="space-y-4">
+                {/* ocena gwiazdkowa */}
+                <div>
+                  <p className="text-[10px] uppercase tracking-widest text-zinc-500 font-body mb-2">OCENA</p>
+                  <div className="flex gap-1">
+                    {[1,2,3,4,5].map(n => (
+                      <button
+                        key={n} type="button"
+                        onClick={() => setReviewForm(f => ({ ...f, rating: n }))}
+                      >
+                        <Star
+                          className="w-6 h-6 transition-colors"
+                          style={{
+                            color: n <= reviewForm.rating ? '#FF2D78' : '#333',
+                            fill:  n <= reviewForm.rating ? '#FF2D78' : '#333',
+                          }}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[10px] uppercase tracking-widest text-zinc-500 font-body mb-1.5">TYTUŁ</label>
+                  <input
+                    value={reviewForm.title}
+                    onChange={e => setReviewForm(f => ({ ...f, title: e.target.value }))}
+                    placeholder="Krótki tytuł..."
+                    className="input text-xs"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] uppercase tracking-widest text-zinc-500 font-body mb-1.5">TREŚĆ</label>
+                  <textarea
+                    value={reviewForm.body}
+                    onChange={e => setReviewForm(f => ({ ...f, body: e.target.value }))}
+                    placeholder="Opisz produkt..."
+                    className="input text-xs resize-none"
+                    rows={3}
+                    required
+                  />
+                </div>
+                {reviewError && (
+                  <p className="text-xs font-body" style={{ color: '#FF2D78' }}>{reviewError}</p>
+                )}
+                <button type="submit" className="btn-primary text-xs inline-flex items-center gap-2">
+                  <Send className="w-3.5 h-3.5" /> WYŚLIJ RECENZJĘ
+                </button>
+              </form>
+            )}
           </div>
         )}
       </div>
