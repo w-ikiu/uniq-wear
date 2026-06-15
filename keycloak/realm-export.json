@@ -10,7 +10,6 @@
   "bruteForceProtected": true,
   "accessTokenLifespan": 300,
   "refreshTokenMaxReuse": 0,
-
   "roles": {
     "realm": [
       {
@@ -23,7 +22,6 @@
       }
     ]
   },
-
   "clients": [
     {
       "clientId": "frontend-spa",
@@ -79,7 +77,6 @@
       "redirectUris": []
     }
   ],
-
   "users": [
     {
       "username": "admin",
@@ -95,7 +92,10 @@
           "temporary": false
         }
       ],
-      "realmRoles": ["admin", "user"]
+      "realmRoles": [
+        "admin",
+        "user"
+      ]
     },
     {
       "username": "user",
@@ -111,7 +111,24 @@
           "temporary": false
         }
       ],
-      "realmRoles": ["user"]
+      "realmRoles": [
+        "user"
+      ]
+    }
+  ],
+  "identityProviders": [
+    {
+      "alias": "google",
+      "displayName": "Google",
+      "providerId": "google",
+      "enabled": true,
+      "trustEmail": true,
+      "config": {
+        "clientId": "REPLACE_WITH_GOOGLE_CLIENT_ID",
+        "clientSecret": "REPLACE_WITH_GOOGLE_CLIENT_SECRET",
+        "syncMode": "IMPORT",
+        "useJwksUrl": "true"
+      }
     }
   ]
 }

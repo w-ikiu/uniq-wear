@@ -20,10 +20,12 @@ const GATEWAY_URL   = process.env.GATEWAY_URL     || 'http://localhost:3000'
 // sesja serwerowa — token zyje w pamieci serwera, nie w localStorage przegladarki
 app.use(session({
   secret:            process.env.SESSION_SECRET || 'ssr-dev-secret-zmien-na-produkcji',
-  resave:            false,
+  resave:            true,
   saveUninitialized: false,
   cookie: {
     httpOnly: true,   // js po stronie klienta nie ma dostepu do ciasteczka
+    secure:   false,  // false bo http (localhost bez tls)
+    sameSite: 'lax',
     maxAge:   60 * 60 * 1000,  // 1 godzina
   },
 }))
@@ -151,7 +153,8 @@ app.get('/callback', async (req, res) => {
     }
     delete req.session.oauthState
 
-    res.redirect('/')
+    // jawny zapis sesji przed redirectem — zapobiega utracie danych przy szybkim przekierowaniu
+    req.session.save(() => res.redirect('/'))
   } catch (err) {
     res.render('error', { user: null, message: 'Blad logowania: ' + err.message })
   }
