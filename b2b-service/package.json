@@ -1,0 +1,15 @@
+{
+  "name": "b2b-service",
+  "version": "1.0.0",
+  "description": "serwis b2b — client credentials flow, raport magazynowy",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "node --watch app.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2"
+  }
+}
