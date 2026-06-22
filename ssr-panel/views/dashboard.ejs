@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>UniqWear — Panel Admina (SSR)</title>
+  <title>UniqWear — Panel SSR</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0 }
     body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0a0a0a; color: #e4e4e7; min-height: 100vh }
@@ -20,6 +20,9 @@
       padding: .2rem .5rem; border-radius: 999px;
       background: rgba(204,255,0,.1); color: #CCFF00; border: 1px solid rgba(204,255,0,.3);
     }
+    .badge-mod {
+      background: rgba(139,92,246,.1); color: #a78bfa; border: 1px solid rgba(139,92,246,.3);
+    }
     .user-bar { display: flex; align-items: center; gap: .75rem; font-size: .75rem; color: #71717a }
     .btn-logout {
       font-size: .65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .1em;
@@ -35,14 +38,20 @@
     }
     .page-title::before { content: '✦'; color: #CCFF00; font-size: .8rem }
 
-    /* nota ze to jest SSR */
     .ssr-note {
       margin-bottom: 1.5rem; padding: .6rem 1rem; border-radius: 10px; font-size: .7rem;
       background: rgba(204,255,0,.05); color: #a3a3a3; border: 1px solid rgba(204,255,0,.15);
     }
     .ssr-note strong { color: #CCFF00 }
 
+    .mod-note {
+      margin-bottom: 1.5rem; padding: .6rem 1rem; border-radius: 10px; font-size: .7rem;
+      background: rgba(139,92,246,.05); color: #a3a3a3; border: 1px solid rgba(139,92,246,.2);
+    }
+    .mod-note strong { color: #a78bfa }
+
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.25rem }
+    .grid-full { grid-column: 1 / -1 }
 
     .card {
       background: #111; border: 1px solid rgba(255,255,255,.06); border-radius: 16px; padding: 1.25rem;
@@ -91,27 +100,39 @@
 <body>
 
 <header class="header">
-  <div class="logo">UNIQ<span>WEAR</span> &nbsp;<span class="badge">SSR ADMIN</span></div>
+  <div class="logo">UNIQ<span>WEAR</span> &nbsp;<span class="badge">SSR PANEL</span></div>
   <div class="user-bar">
     <span><%= user.name %></span>
-    <span class="badge">ADMIN</span>
+    <% if (isAdmin) { %>
+      <span class="badge">ADMIN</span>
+    <% } else { %>
+      <span class="badge badge-mod">MODERATOR</span>
+    <% } %>
     <a href="/logout"><button class="btn-logout">Wyloguj</button></a>
   </div>
 </header>
 
 <main class="main">
-  <h1 class="page-title">Panel Administracyjny</h1>
+  <h1 class="page-title"><%= isAdmin ? 'Panel Administracyjny' : 'Panel Moderatora' %></h1>
 
   <div class="ssr-note">
     <strong>Strona renderowana server-side.</strong>
-    Token dostępu jest przechowywany w sesji serwerowej (Express Session) — nie trafia do przeglądarki.
+    Token dostępu przechowywany w sesji serwerowej (Express Session) — nie trafia do przeglądarki.
     Flow: Authorization Code (Keycloak) → wymiana kodu na token → sesja po stronie serwera.
   </div>
 
+  <% if (!isAdmin) { %>
+  <div class="mod-note">
+    <strong>Rola: Moderator.</strong>
+    Masz dostęp wyłącznie do moderacji recenzji użytkowników.
+    Zarządzanie produktami, kategoriami i podgląd zamówień wymagają roli Admin.
+  </div>
+  <% } %>
+
   <div class="grid">
 
-    <!-- oczekujace recenzje -->
-    <div class="card">
+    <!-- oczekujace recenzje — widoczne dla admina i moderatora -->
+    <div class="card <%= isAdmin ? '' : 'grid-full' %>">
       <div class="card-title">
         Recenzje oczekujące <span class="count"><%= reviews.length %></span>
       </div>
@@ -119,13 +140,14 @@
         <p class="empty">Brak oczekujacych recenzji</p>
       <% } else { %>
         <table>
-          <thead><tr><th>Produkt</th><th>Ocena</th><th>Tytuł</th><th></th></tr></thead>
+          <thead><tr><th>Produkt</th><th>Ocena</th><th>Tytuł</th><th>Treść</th><th></th></tr></thead>
           <tbody>
             <% reviews.forEach(r => { %>
             <tr>
               <td>#<%= r.productId %></td>
               <td><span class="stars"><%= '★'.repeat(r.rating) %><%= '☆'.repeat(5 - r.rating) %></span></td>
               <td><%= r.title || '—' %></td>
+              <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><%= r.body || '—' %></td>
               <td>
                 <form method="POST" action="/reviews/<%= r._id %>/approve" style="display:inline">
                   <button class="btn-approve">✓ Zatwierdź</button>
@@ -137,6 +159,9 @@
         </table>
       <% } %>
     </div>
+
+    <!-- sekcje tylko dla admina -->
+    <% if (isAdmin) { %>
 
     <!-- ostatnie zamowienia -->
     <div class="card">
@@ -197,6 +222,8 @@
         </table>
       <% } %>
     </div>
+
+    <% } %>
 
   </div>
 </main>

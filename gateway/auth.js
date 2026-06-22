@@ -31,13 +31,17 @@ const PUBLIC_ROUTES = [
   { method: 'GET',    path: /^\/(health|ready|metrics)$/ },
 ];
 
-// endpointy tylko dla admina (modyfikacja katalogu)
+// endpointy tylko dla admina (zarzadzanie produktami i kategoriami)
 const ADMIN_ROUTES = [
   { method: 'POST',   path: /^\/catalog\/api\/products/ },
   { method: 'PATCH',  path: /^\/catalog\/api\/products/ },
   { method: 'DELETE', path: /^\/catalog\/api\/products/ },
   { method: 'POST',   path: /^\/catalog\/api\/categories/ },
   { method: 'DELETE', path: /^\/catalog\/api\/categories/ },
+];
+
+// endpointy dla admina lub moderatora (moderacja recenzji)
+const MODERATOR_ROUTES = [
   { method: 'PATCH',  path: /^\/catalog\/api\/reviews\/.+\/approve/ },
   { method: 'DELETE', path: /^\/catalog\/api\/reviews/ },
 ];
@@ -50,6 +54,12 @@ function isPublic(req) {
 
 function requiresAdmin(req) {
   return ADMIN_ROUTES.some(
+    r => r.method === req.method && r.path.test(req.path)
+  );
+}
+
+function requiresModerator(req) {
+  return MODERATOR_ROUTES.some(
     r => r.method === req.method && r.path.test(req.path)
   );
 }
@@ -91,6 +101,17 @@ function authMiddleware(req, res, next) {
         error: 'brak uprawnien — wymagana rola admin',
         code: 403,
       });
+    }
+
+    // moderacja recenzji dostepna dla admina lub moderatora
+    if (requiresModerator(req)) {
+      const roles = getRoles(payload);
+      if (!roles.includes('admin') && !roles.includes('moderator')) {
+        return res.status(403).json({
+          error: 'brak uprawnien — wymagana rola admin lub moderator',
+          code: 403,
+        });
+      }
     }
 
     // przekazujemy informacje o uzytkowniku do serwisow za pomoca naglowkow

@@ -61,38 +61,45 @@ function requireAuth(req, res, next) {
   next()
 }
 
-// middleware — wymaga roli admin w tokenie
-function requireAdmin(req, res, next) {
+// middleware — wymaga roli admin lub moderator
+function requireAdminOrModerator(req, res, next) {
   const roles = req.session.user?.roles || []
-  if (!roles.includes('admin')) {
+  if (!roles.includes('admin') && !roles.includes('moderator')) {
     return res.status(403).render('error', {
       user: req.session.user,
-      message: 'Brak uprawnien — wymagana rola admin.',
+      message: 'Brak uprawnien — wymagana rola admin lub moderator.',
     })
   }
   next()
 }
 
-// dashboard — pobiera dane z backendu i renderuje serwer-side
-app.get('/', requireAuth, requireAdmin, async (req, res) => {
-  const token = req.session.tokens.access_token
+// dashboard — admin widzi wszystko, moderator tylko recenzje
+app.get('/', requireAuth, requireAdminOrModerator, async (req, res) => {
+  const token   = req.session.tokens.access_token
+  const roles   = req.session.user?.roles || []
+  const isAdmin = roles.includes('admin')
 
   try {
-    // rownolegle zapytania do gateway z tokenem admina
-    const [orders, pendingReviews, stats, analytics] = await Promise.all([
-      apiGet('/checkout/api/orders',            token),
-      apiGet('/catalog/api/reviews?status=pending', token),
-      apiGet('/catalog/api/stats/inventory',    token),
-      // analityki sa publiczne — wyniki zatwierdzonych recenzji
-      axios.get(`${GATEWAY_URL}/catalog/api/analytics/ratings`, { timeout: 5000 }).then(r => r.data),
-    ])
+    let orders = [], stats = [], analytics = []
+    // moderator pobiera tylko recenzje — nie ma dostepu do zamowien i statystyk
+    const pendingReviews = await apiGet('/catalog/api/reviews?status=pending', token)
+
+    if (isAdmin) {
+      // admin pobiera wszystkie dane rownolegле
+      ;[orders, stats, analytics] = await Promise.all([
+        apiGet('/checkout/api/orders', token).then(d => d.slice(0, 10)),
+        apiGet('/catalog/api/stats/inventory', token),
+        axios.get(`${GATEWAY_URL}/catalog/api/analytics/ratings`, { timeout: 5000 }).then(r => r.data.slice(0, 10)),
+      ])
+    }
 
     res.render('dashboard', {
       user:    req.session.user,
-      orders:  orders.slice(0, 10),
-      reviews: pendingReviews.slice(0, 10),
+      isAdmin,
+      orders,
+      reviews: pendingReviews.slice(0, 20),
       stats,
-      analytics: analytics.slice(0, 10),
+      analytics,
     })
   } catch (err) {
     const status = err.response?.status || 500
@@ -180,8 +187,8 @@ app.get('/logout', async (req, res) => {
   }
 })
 
-// zatwierdzenie recenzji — POST z dashboardu
-app.post('/reviews/:id/approve', requireAuth, requireAdmin, async (req, res) => {
+// zatwierdzenie recenzji — dostepne dla admina i moderatora
+app.post('/reviews/:id/approve', requireAuth, requireAdminOrModerator, async (req, res) => {
   const token = req.session.tokens.access_token
   try {
     await axios.patch(`${GATEWAY_URL}/catalog/api/reviews/${req.params.id}/approve`, null, {

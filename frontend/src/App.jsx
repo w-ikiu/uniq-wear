@@ -10,6 +10,7 @@ import CheckoutPage from './pages/CheckoutPage'
 import OrderSuccessPage from './pages/OrderSuccessPage'
 import AdminPage from './pages/AdminPage'
 import OrdersPage from './pages/OrdersPage'
+import ModeratorPage from './pages/ModeratorPage'
 
 export default function App() {
   return (
@@ -29,6 +30,7 @@ export default function App() {
               <Route path="/orders"        element={<OrdersPage />} />
               {/* trasa /admin dostepna dla wszystkich — sama strona sprawdza role */}
               <Route path="/admin"         element={<AdminPage />} />
+              <Route path="/moderator"     element={<ModeratorPage />} />
             </Routes>
           </div>
         </BrowserRouter>

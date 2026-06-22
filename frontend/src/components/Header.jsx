@@ -12,7 +12,8 @@ export default function Header() {
   const [scrolled, setScrolled] = useState(false)
   const navigate = useNavigate()
 
-  const isAdmin = user?.roles?.includes('admin')
+  const isAdmin     = user?.roles?.includes('admin')
+  const isModerator = user?.roles?.includes('moderator') && !isAdmin
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20)
@@ -100,6 +101,19 @@ export default function Header() {
                 <Shield className="w-3 h-3" /> Admin
               </NavLink>
             )}
+            {/* link do panelu moderatora — tylko dla uzytkownikow z rola moderator (bez admina) */}
+            {isModerator && (
+              <NavLink
+                to="/moderator"
+                className={({ isActive }) =>
+                  `px-4 py-2 rounded-lg text-xs font-semibold uppercase tracking-widest transition-all duration-150 font-body flex items-center gap-1.5 ${
+                    isActive ? 'text-[#a78bfa]' : 'text-zinc-400 hover:text-[#a78bfa]'
+                  }`
+                }
+              >
+                <Shield className="w-3 h-3" /> Moderacja
+              </NavLink>
+            )}
           </nav>
 
           {/* Actions */}
@@ -134,11 +148,15 @@ export default function Header() {
                     {user?.name}
                   </span>
                   {isAdmin && (
-                    <span
-                      className="text-[9px] font-black font-body uppercase px-2 py-0.5 rounded-full"
-                      style={{ background: 'rgba(204,255,0,0.1)', color: '#CCFF00', border: '1px solid rgba(204,255,0,0.3)' }}
-                    >
+                    <span className="text-[9px] font-black font-body uppercase px-2 py-0.5 rounded-full"
+                      style={{ background: 'rgba(204,255,0,0.1)', color: '#CCFF00', border: '1px solid rgba(204,255,0,0.3)' }}>
                       ADMIN
+                    </span>
+                  )}
+                  {isModerator && (
+                    <span className="text-[9px] font-black font-body uppercase px-2 py-0.5 rounded-full"
+                      style={{ background: 'rgba(139,92,246,0.1)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.3)' }}>
+                      MOD
                     </span>
                   )}
                   <button
@@ -240,6 +258,19 @@ export default function Header() {
                 }
               >
                 <Shield className="w-3 h-3" /> ADMIN
+              </NavLink>
+            )}
+            {isModerator && (
+              <NavLink
+                to="/moderator"
+                onClick={() => setMenuOpen(false)}
+                className={({ isActive }) =>
+                  `block px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-widest font-body transition-colors flex items-center gap-2 ${
+                    isActive ? 'text-[#a78bfa] bg-[rgba(139,92,246,0.08)]' : 'text-zinc-400'
+                  }`
+                }
+              >
+                <Shield className="w-3 h-3" /> MODERACJA
               </NavLink>
             )}
             {/* login / logout w menu mobilnym */}

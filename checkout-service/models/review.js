@@ -9,7 +9,7 @@ const moderationSchema = new mongoose.Schema({
 
 const reviewSchema = new mongoose.Schema({
   productId: { type: Number, required: true },
-  userId: { type: Number, required: true },
+  userId: { type: String, required: true },
   rating: {
     type: Number,
     required: true,
@@ -23,8 +23,10 @@ const reviewSchema = new mongoose.Schema({
   },
   title: String,
   body: String,
+  // status ustawiany przez catalog-service przy zatwierdzaniu
+  status: { type: String, default: 'pending' },
   // wymog t6: tablica zagniezdzona subdokumentow
-  moderationHistory: [moderationSchema] 
+  moderationHistory: [moderationSchema]
 });
 
 // wymog t6: pre hook (ustawienie domyslnej historii przy tworzeniu)
@@ -37,9 +39,9 @@ reviewSchema.pre('save', function(next) {
 
 // wymog t6: statics (metoda statyczna do pobierania zatwierdzonych)
 reviewSchema.statics.findApproved = function(productId) {
-  return this.find({ 
-    productId, 
-    'moderationHistory.status': 'approved' 
+  return this.find({
+    productId,
+    status: 'approved'
   });
 };
 

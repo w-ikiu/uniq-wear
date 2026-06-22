@@ -19,6 +19,10 @@
       {
         "name": "user",
         "description": "zwykly uzytkownik — moze przegladac produkty i skladac zamowienia"
+      },
+      {
+        "name": "moderator",
+        "description": "moderator — moze zatwierdzac i odrzucac recenzje uzytkownikow"
       }
     ]
   },
