@@ -39,6 +39,7 @@ const ADMIN_ROUTES = [
   { method: 'POST',   path: /^\/catalog\/api\/categories/ },
   { method: 'DELETE', path: /^\/catalog\/api\/categories/ },
   { method: 'PATCH',  path: /^\/catalog\/api\/reviews\/.+\/approve/ },
+  { method: 'DELETE', path: /^\/catalog\/api\/reviews/ },
 ];
 
 function isPublic(req) {

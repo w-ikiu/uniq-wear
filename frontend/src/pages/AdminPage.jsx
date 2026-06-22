@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Shield, Plus, RefreshCw, Package, Tag, BarChart2, Star, Check, Search, Boxes } from 'lucide-react'
+import { Shield, Plus, RefreshCw, Package, Tag, BarChart2, Star, Check, Search, Boxes, Trash2, X } from 'lucide-react'
 import { useKeycloak } from '../KeycloakContext'
 import { api } from '../api'
 
@@ -23,6 +23,7 @@ export default function AdminPage() {
   const isAdmin = user?.roles?.includes('admin')
 
   const [categories, setCategories]         = useState([])
+  const [products, setProducts]             = useState([])
   const [orders, setOrders]                 = useState([])
   const [stats, setStats]                   = useState([])
   const [pendingReviews, setPendingReviews] = useState([])
@@ -36,13 +37,14 @@ export default function AdminPage() {
     name: '', description: '', categoryId: '', price: '', sku: '', longDescription: '', stock: '0'
   })
 
-  const [loadingCats, setLoadingCats]         = useState(false)
-  const [loadingOrders, setLoadingOrders]     = useState(false)
-  const [loadingStats, setLoadingStats]       = useState(false)
-  const [loadingReviews, setLoadingReviews]   = useState(false)
+  const [loadingCats, setLoadingCats]           = useState(false)
+  const [loadingProducts, setLoadingProducts]   = useState(false)
+  const [loadingOrders, setLoadingOrders]       = useState(false)
+  const [loadingStats, setLoadingStats]         = useState(false)
+  const [loadingReviews, setLoadingReviews]     = useState(false)
   const [loadingAnalytics, setLoadingAnalytics] = useState(false)
-  const [loadingSearch, setLoadingSearch]     = useState(false)
-  const [loadingProduct, setLoadingProduct]   = useState(false)
+  const [loadingSearch, setLoadingSearch]       = useState(false)
+  const [loadingProduct, setLoadingProduct]     = useState(false)
 
   const [error, setError]     = useState('')
   const [success, setSuccess] = useState('')
@@ -53,7 +55,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (!isAdmin) return
-    fetchCategories(); fetchOrders(); fetchStats(); fetchPendingReviews(); fetchAnalytics()
+    fetchCategories(); fetchProducts(); fetchOrders(); fetchStats(); fetchPendingReviews(); fetchAnalytics()
   }, [isAdmin])
 
   function notify(msg, isError = false) {
@@ -64,6 +66,10 @@ export default function AdminPage() {
   function fetchCategories() {
     setLoadingCats(true)
     api.getCategories().then(setCategories).catch(() => notify('blad pobierania kategorii', true)).finally(() => setLoadingCats(false))
+  }
+  function fetchProducts() {
+    setLoadingProducts(true)
+    api.getProducts().then(setProducts).catch(() => {}).finally(() => setLoadingProducts(false))
   }
   function fetchOrders() {
     setLoadingOrders(true)
@@ -93,12 +99,39 @@ export default function AdminPage() {
     } catch (err) { notify(err.message, true) }
   }
 
+  async function handleDeleteCategory(id) {
+    if (!window.confirm('Usunac kategorie?')) return
+    try {
+      await api.deleteCategory(id)
+      notify('kategoria usunieta')
+      fetchCategories()
+    } catch (err) { notify(err.message, true) }
+  }
+
+  async function handleDeleteProduct(id) {
+    if (!window.confirm('Usunac produkt? Operacja nieodwracalna.')) return
+    try {
+      await api.deleteProduct(id)
+      notify('produkt usuniety')
+      fetchProducts()
+      fetchStats()
+    } catch (err) { notify(err.message, true) }
+  }
+
   async function handleApproveReview(reviewId) {
     try {
       await api.approveReview(reviewId)
       notify('recenzja zatwierdzona')
       fetchPendingReviews()
       fetchAnalytics()
+    } catch (err) { notify(err.message, true) }
+  }
+
+  async function handleRejectReview(reviewId) {
+    try {
+      await api.deleteReview(reviewId)
+      notify('recenzja odrzucona')
+      fetchPendingReviews()
     } catch (err) { notify(err.message, true) }
   }
 
@@ -159,7 +192,14 @@ export default function AdminPage() {
             {categories.map(cat => (
               <li key={cat.id} className="flex items-center justify-between py-2 px-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.02)' }}>
                 <span className="text-xs font-body text-zinc-300">{cat.name}</span>
-                <span className="text-[10px] text-zinc-600 font-body">#{cat.id}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-zinc-600 font-body">#{cat.id}</span>
+                  <button onClick={() => handleDeleteCategory(cat.id)}
+                    className="p-1 rounded-lg transition-colors hover:bg-pink-900/20"
+                    style={{ color: '#FF2D78' }} title="Usun kategorie">
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
@@ -222,13 +262,21 @@ export default function AdminPage() {
                       {r.title && <p className="text-xs font-bold text-white font-body truncate">{r.title}</p>}
                       {r.body  && <p className="text-[10px] text-zinc-500 font-body mt-0.5 line-clamp-2">{r.body}</p>}
                     </div>
-                    {/* zatwierdzenie recenzji — wymaga roli admin, inkrementuje licznik w pg */}
-                    <button onClick={() => handleApproveReview(r._id)}
-                      className="flex-shrink-0 p-1.5 rounded-lg transition-colors"
-                      style={{ background: 'rgba(204,255,0,0.1)', border: '1px solid rgba(204,255,0,0.3)', color: '#CCFF00' }}
-                      title="Zatwierdz">
-                      <Check className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="flex gap-1 flex-shrink-0">
+                      {/* zatwierdzenie recenzji — wymaga roli admin, inkrementuje licznik w pg */}
+                      <button onClick={() => handleApproveReview(r._id)}
+                        className="p-1.5 rounded-lg transition-colors"
+                        style={{ background: 'rgba(204,255,0,0.1)', border: '1px solid rgba(204,255,0,0.3)', color: '#CCFF00' }}
+                        title="Zatwierdz">
+                        <Check className="w-3.5 h-3.5" />
+                      </button>
+                      <button onClick={() => handleRejectReview(r._id)}
+                        className="p-1.5 rounded-lg transition-colors"
+                        style={{ background: 'rgba(255,45,120,0.1)', border: '1px solid rgba(255,45,120,0.3)', color: '#FF2D78' }}
+                        title="Odrzuc i usun">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </li>
               ))}
@@ -256,7 +304,47 @@ export default function AdminPage() {
         </Section>
       </div>
 
-      {/* row 3: nowy produkt (hybrid), wyszukiwanie mongodb */}
+      {/* row 3: lista produktow z usuwaniem */}
+      <div className="mb-6">
+        <Section title={`Produkty (${products.length})`} icon={Package} loading={loadingProducts}>
+          {products.length === 0 ? <p className="text-xs text-zinc-600 font-body">brak produktow</p> : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs font-body">
+                <thead>
+                  <tr className="text-left text-[9px] uppercase tracking-widest text-zinc-600 border-b border-zinc-800">
+                    <th className="pb-2 pr-4">ID</th>
+                    <th className="pb-2 pr-4">Nazwa</th>
+                    <th className="pb-2 pr-4">Kategoria</th>
+                    <th className="pb-2 pr-4">Cena od</th>
+                    <th className="pb-2"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-800/50">
+                  {products.map(p => (
+                    <tr key={p.id} className="hover:bg-white/[0.02] transition-colors">
+                      <td className="py-2 pr-4 text-zinc-600">#{p.id}</td>
+                      <td className="py-2 pr-4 text-zinc-300 max-w-[200px] truncate">{p.name}</td>
+                      <td className="py-2 pr-4 text-zinc-500">{p.categoryName || `kat.${p.categoryId}`}</td>
+                      <td className="py-2 pr-4 font-bold" style={{ color: '#CCFF00' }}>
+                        {p.minPrice != null ? `${Number(p.minPrice).toFixed(2)} zł` : '—'}
+                      </td>
+                      <td className="py-2">
+                        <button onClick={() => handleDeleteProduct(p.id)}
+                          className="p-1.5 rounded-lg transition-colors hover:bg-pink-900/20"
+                          style={{ color: '#FF2D78' }} title="Usun produkt">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Section>
+      </div>
+
+      {/* row 4: nowy produkt (hybrid), wyszukiwanie mongodb */}
       <div className="grid lg:grid-cols-2 gap-6">
 
         <Section title="Nowy produkt (zapis hybryda PG + MongoDB)" icon={Boxes} loading={loadingProduct}>

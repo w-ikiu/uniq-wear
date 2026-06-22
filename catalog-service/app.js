@@ -559,6 +559,61 @@ app.patch('/api/reviews/:id/approve', async (req, res) => {
   }
 });
 
+// usuwanie produktu — kasuje z pg (warianty + produkt) i mongodb (detale)
+app.delete('/api/products/:id', async (req, res) => {
+  const id = parseInt(req.params.id);
+  try {
+    await ProductDetails.deleteOne({ productId: id });
+    await prisma.variant.deleteMany({ where: { productId: id } });
+    await prisma.product.delete({ where: { id } });
+    res.json({ message: 'produkt usuniety' });
+  } catch (err) {
+    const status = err.code === 'P2025' ? 404 : 500;
+    res.status(status).json({ error: 'blad usuwania produktu', details: err.message });
+  }
+});
+
+// aktualizacja nazwy i opisu produktu w pg
+app.patch('/api/products/:id', async (req, res) => {
+  const id = parseInt(req.params.id);
+  const { name, description } = req.body;
+  try {
+    const product = await prisma.product.update({
+      where: { id },
+      data: {
+        ...(name        && { name }),
+        ...(description && { description }),
+      },
+    });
+    res.json(product);
+  } catch (err) {
+    const status = err.code === 'P2025' ? 404 : 500;
+    res.status(status).json({ error: 'blad aktualizacji produktu', details: err.message });
+  }
+});
+
+// usuwanie kategorii
+app.delete('/api/categories/:id', async (req, res) => {
+  try {
+    await prisma.category.delete({ where: { id: parseInt(req.params.id) } });
+    res.json({ message: 'kategoria usunieta' });
+  } catch (err) {
+    const status = err.code === 'P2025' ? 404 : 500;
+    res.status(status).json({ error: 'blad usuwania kategorii', details: err.message });
+  }
+});
+
+// usuwanie recenzji przez admina (odrzucenie)
+app.delete('/api/reviews/:id', async (req, res) => {
+  try {
+    const result = await Review.findByIdAndDelete(req.params.id);
+    if (!result) return res.status(404).json({ error: 'nie znaleziono recenzji' });
+    res.json({ message: 'recenzja usunieta' });
+  } catch (err) {
+    res.status(500).json({ error: 'blad usuwania recenzji', details: err.message });
+  }
+});
+
 // endpoint do zarzadzania kategoriami (wymagany do tworzenia produktow)
 app.get('/api/categories', async (req, res) => {
   try {

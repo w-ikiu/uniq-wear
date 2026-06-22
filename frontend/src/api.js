@@ -63,6 +63,25 @@ export const api = {
     })
   },
 
+  deleteCategory(id) {
+    return request(`${CATALOG}/categories/${id}`, { method: 'DELETE' })
+  },
+
+  deleteProduct(id) {
+    return request(`${CATALOG}/products/${id}`, { method: 'DELETE' })
+  },
+
+  updateProduct(id, { name, description }) {
+    return request(`${CATALOG}/products/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ name, description }),
+    })
+  },
+
+  deleteReview(id) {
+    return request(`${CATALOG}/reviews/${id}`, { method: 'DELETE' })
+  },
+
   // recenzje
   getReviews(productId) {
     return request(`${CHECKOUT}/reviews/${productId}`)
