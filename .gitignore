@@ -1,5 +1,8 @@
 node_modules/
 .env
+# klucze google — nigdy nie commitowac
+b2b-service/google-service-account.json
+**/google-service-account.json
 dist/
 coverage/
 .DS_Store
@@ -11,3 +14,4 @@ NOTATKI.md
 OBRONA_NOTATKI.md
 CHECKLIST.md
 NOTATKI_CHMUROWE.md
+OBRONA_SECURITY.md

@@ -1,6 +1,7 @@
 require('dotenv').config()
-const express = require('express')
-const axios   = require('axios')
+const express              = require('express')
+const axios                = require('axios')
+const { exportReportToSheets } = require('./googleSheets')
 
 const app = express()
 app.use(express.json())
@@ -116,6 +117,44 @@ app.get('/token-info', async (req, res) => {
     })
   } catch (err) {
     res.status(500).json({ error: err.message })
+  }
+})
+
+// eksportuje raport do google sheets i zwraca link do arkusza
+app.post('/report/export', async (req, res) => {
+  try {
+    const [products, stats, analytics] = await Promise.all([
+      apiGet('/catalog/api/products'),
+      apiGet('/catalog/api/stats/inventory'),
+      apiGet('/catalog/api/analytics/ratings'),
+    ])
+
+    const ratingsMap = Object.fromEntries(
+      analytics.map(a => [a.productId, { avg: a.averageRating, count: a.reviewCount }])
+    )
+
+    const report = {
+      generatedAt: new Date().toISOString(),
+      summary: {
+        totalProducts:  products.length,
+        totalStock:     stats.reduce((s, c) => s + c.totalStock, 0),
+        categoriesCount: stats.length,
+      },
+      inventoryByCategory: stats,
+      products: products.map(p => ({
+        id:       p.id,
+        name:     p.name,
+        category: p.categoryName,
+        minPrice: p.minPrice,
+        rating:   ratingsMap[p.id] || null,
+      })),
+    }
+
+    const url = await exportReportToSheets(report)
+    res.json({ success: true, spreadsheetUrl: url, exportedAt: report.generatedAt })
+  } catch (err) {
+    const status = err.response?.status || 500
+    res.status(status).json({ error: 'blad eksportu do google sheets', details: err.message })
   }
 })
 

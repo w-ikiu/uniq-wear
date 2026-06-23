@@ -51,6 +51,15 @@ services:
       retries: 15
       start_period: 60s
 
+  # lokalny serwer smtp do testowania emaili (reset hasla, weryfikacja)
+  # nie wysyla prawdziwych maili — przechwytuje je i pokazuje w UI na porcie 8025
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: uniqwear_mailhog
+    ports:
+      - "1025:1025"   # smtp — keycloak wysyla tutaj
+      - "8025:8025"   # web ui — podejrzyj maile w przegladarce
+
   mongo:
     image: mongo:latest
     container_name: uniqwear_mongo
@@ -97,6 +106,27 @@ services:
         condition: service_healthy
       mongo:
         condition: service_healthy
+
+  # klient b2b — client credentials flow, generuje raporty magazynowe i eksportuje do google sheets
+  b2b-service:
+    build:
+      context: ./b2b-service
+      dockerfile: Dockerfile
+    container_name: uniqwear_b2b
+    ports:
+      - "4001:4001"
+    environment:
+      - KEYCLOAK_URL=http://uniqwear_keycloak:8080
+      - KEYCLOAK_REALM=uniqwear
+      - CLIENT_SECRET=b2b-service-secret-dev
+      - GATEWAY_URL=http://uniqwear_gateway:3000
+      - SHEETS_SPREADSHEET_ID=1qdJmao5JtsNcwwJWinZnFMV67Jg1mPtHdEScIS9RUX8
+    volumes:
+      # klucz google service account montowany jako wolumin — nie commitowany do repo
+      - ./b2b-service/google-service-account.json:/app/google-service-account.json:ro
+    depends_on:
+      keycloak:
+        condition: service_started
 
   # t8b: api gateway - pojedynczy punkt wejscia dla wszystkich serwisow
   # gateway rowniez waliduje tokeny jwt przed przekazaniem ruchu do serwisow

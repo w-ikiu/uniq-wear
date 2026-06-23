@@ -82,29 +82,36 @@ app.post('/api/checkout', async (req, res) => {
       const orderLinesData = [];
 
       for (const item of items) {
-        const [variants] = await sequelize.query(
-          `SELECT id, price, stock FROM "Variant" WHERE sku = :sku FOR UPDATE`,
-          { replacements: { sku: item.sku }, transaction: t }
-        );
+        // frontend wysyla variantId, starsze klienty moga wysylac sku — obslugujemy oba
+        const [variants] = item.variantId
+          ? await sequelize.query(
+              `SELECT id, sku, price, stock FROM "Variant" WHERE id = :variantId FOR UPDATE`,
+              { replacements: { variantId: item.variantId }, transaction: t }
+            )
+          : await sequelize.query(
+              `SELECT id, sku, price, stock FROM "Variant" WHERE sku = :sku FOR UPDATE`,
+              { replacements: { sku: item.sku }, transaction: t }
+            );
 
         const variant = variants[0];
-        if (!variant) throw Object.assign(new Error(`wariant ${item.sku} nie istnieje`), { status: 404 });
+        const variantRef = item.variantId || item.sku;
+        if (!variant) throw Object.assign(new Error(`wariant ${variantRef} nie istnieje`), { status: 404 });
 
         // blokada oversell - zwraca 409 gdy brak stanu
         if (variant.stock < item.quantity) {
-          throw Object.assign(new Error(`brak wystarczajacej ilosci dla ${item.sku}`), { status: 409 });
+          throw Object.assign(new Error(`brak wystarczajacej ilosci dla ${variant.sku}`), { status: 409 });
         }
 
         await sequelize.query(
-          `UPDATE "Variant" SET stock = stock - :quantity WHERE sku = :sku`,
-          { replacements: { quantity: item.quantity, sku: item.sku }, transaction: t }
+          `UPDATE "Variant" SET stock = stock - :quantity WHERE id = :id`,
+          { replacements: { quantity: item.quantity, id: variant.id }, transaction: t }
         );
 
         const linePrice = parseFloat(variant.price);
         totalAmount += linePrice * item.quantity;
         orderLinesData.push({
-          sku: item.sku,
-          price: linePrice, // snapshot ceny
+          sku: variant.sku,
+          price: linePrice,
           quantity: item.quantity
         });
       }

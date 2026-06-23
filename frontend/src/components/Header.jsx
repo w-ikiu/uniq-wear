@@ -144,9 +144,20 @@ export default function Header() {
             {ready && (
               authenticated ? (
                 <div className="hidden md:flex items-center gap-2">
-                  <span className="text-[10px] text-zinc-500 font-body uppercase tracking-widest">
-                    {user?.name}
-                  </span>
+                  {/* avatar google — widoczny gdy uzytkownik zalogowal sie przez google */}
+                  {user?.picture ? (
+                    <img
+                      src={user.picture}
+                      alt={user.name}
+                      className="w-7 h-7 rounded-full object-cover"
+                      style={{ border: '1px solid rgba(255,45,120,0.3)' }}
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <span className="text-[10px] text-zinc-500 font-body uppercase tracking-widest">
+                      {user?.name}
+                    </span>
+                  )}
                   {isAdmin && (
                     <span className="text-[9px] font-black font-body uppercase px-2 py-0.5 rounded-full"
                       style={{ background: 'rgba(204,255,0,0.1)', color: '#CCFF00', border: '1px solid rgba(204,255,0,0.3)' }}>

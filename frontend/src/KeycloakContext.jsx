@@ -42,7 +42,8 @@ export function KeycloakProvider({ children }) {
             email: keycloak.tokenParsed?.email || '',
             name:  keycloak.tokenParsed?.preferred_username || '',
             // role realm sa w realm_access.roles w payloadzie tokenu
-            roles: keycloak.tokenParsed?.realm_access?.roles || [],
+            roles:   keycloak.tokenParsed?.realm_access?.roles || [],
+            picture: keycloak.tokenParsed?.picture || null,
           })
         }
         setReady(true)
