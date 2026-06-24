@@ -1,8 +1,8 @@
 require('dotenv').config()
-const express  = require('express')
-const session  = require('express-session')
-const axios    = require('axios')
-const { Issuer, generators } = require('openid-client')
+const express = require('express')
+const session = require('express-session')
+const axios   = require('axios')
+const crypto  = require('crypto')
 
 const app = express()
 app.set('view engine', 'ejs')
@@ -23,30 +23,44 @@ app.use(session({
   resave:            true,
   saveUninitialized: false,
   cookie: {
-    httpOnly: true,   // js po stronie klienta nie ma dostepu do ciasteczka
+    httpOnly: true,   // js po stronie klienta nie ma dostepu do ciasteczka sesji
     secure:   false,  // false bo http (localhost bez tls)
     sameSite: 'lax',
-    maxAge:   60 * 60 * 1000,  // 1 godzina
+    maxAge:   60 * 60 * 1000,
   },
 }))
 
-// klient oidc tworzymy raz (leniwa inicjalizacja przez discovery endpoint keycloaka)
-let oidcClient = null
+// cache endpointow z discovery — pobieramy raz, nie przy kazdym zadaniu
+let oidcEndpoints = null
 
-async function getClient() {
-  if (oidcClient) return oidcClient
-  // discovery pobiera konfiguracje keycloaka (adresy tokenow, jwks, logout itd.)
-  const issuer = await Issuer.discover(`${KEYCLOAK_URL}/realms/${REALM}`)
-  oidcClient = new issuer.Client({
-    client_id:      CLIENT_ID,
-    client_secret:  CLIENT_SECRET,
-    redirect_uris:  [REDIRECT_URI],
-    response_types: ['code'],
-  })
-  return oidcClient
+// discovery pobiera adresy endpointow keycloaka z dobrze znango url
+// dzieki temu nie hardkodujemy adresow token/auth/logout endpoint
+async function getEndpoints() {
+  if (oidcEndpoints) return oidcEndpoints
+  const res = await axios.get(
+    `${KEYCLOAK_URL}/realms/${REALM}/.well-known/openid-configuration`,
+    { timeout: 5000 }
+  )
+  oidcEndpoints = {
+    auth:   res.data.authorization_endpoint,
+    token:  res.data.token_endpoint,
+    logout: res.data.end_session_endpoint,
+  }
+  return oidcEndpoints
 }
 
-// pomocnicza — pobiera dane z gateway z tokenem admina
+// losowy state — 32 bajty = 64 znaki hex — ochrona przed atakami csrf
+function generateState() {
+  return crypto.randomBytes(32).toString('hex')
+}
+
+// dekoduje payload jwt bez weryfikacji podpisu
+// weryfikacja podpisu odbywa sie w gateway — tutaj tylko odczytujemy dane uzytkownika
+function decodeJwtPayload(token) {
+  return JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString())
+}
+
+// pomocnicza — pobiera dane z gateway z tokenem uzytkownika
 async function apiGet(path, token) {
   const res = await axios.get(`${GATEWAY_URL}${path}`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -66,7 +80,7 @@ function requireAdminOrModerator(req, res, next) {
   const roles = req.session.user?.roles || []
   if (!roles.includes('admin') && !roles.includes('moderator')) {
     return res.status(403).render('error', {
-      user: req.session.user,
+      user:    req.session.user,
       message: 'Brak uprawnien — wymagana rola admin lub moderator.',
     })
   }
@@ -113,75 +127,97 @@ app.get('/', requireAuth, requireAdminOrModerator, async (req, res) => {
 // poczatek authorization code flow — redirect do strony logowania keycloaka
 app.get('/login', async (req, res) => {
   try {
-    const client = await getClient()
-    // state chroni przed atakami csrf
-    const state  = generators.state()
+    const ep = await getEndpoints()
+
+    // state chroni przed atakami csrf — zapisujemy w sesji, porownujemy w /callback
+    const state = generateState()
     req.session.oauthState = state
 
-    const url = client.authorizationUrl({
-      scope: 'openid email profile',
+    // budujemy url autoryzacji recznie — bez bibliotek
+    const params = new URLSearchParams({
+      response_type: 'code',
+      client_id:     CLIENT_ID,
+      redirect_uri:  REDIRECT_URI,
+      scope:         'openid email profile',
       state,
     })
-    res.redirect(url)
+
+    res.redirect(`${ep.auth}?${params}`)
   } catch (err) {
     res.render('error', { user: null, message: 'Nie mozna polaczyc sie z Keycloak: ' + err.message })
   }
 })
 
-// callback — keycloak przekierowuje tutaj po udanym logowaniu z kodem autoryzacji
+// callback — keycloak przekierowuje tutaj z kodem autoryzacji po udanym logowaniu
 app.get('/callback', async (req, res) => {
   try {
-    const client = await getClient()
-    const params = client.callbackParams(req)
+    const { code, state } = req.query
 
-    // wymiana kodu autoryzacji na access_token, id_token, refresh_token
-    // klient uzywa client_secret — bezpieczne, bo odbywa sie serwer-serwer
-    const tokens = await client.callback(REDIRECT_URI, params, {
-      state: req.session.oauthState,
+    // weryfikacja state — jesli rozni sie od zapisanego w sesji, to mozliwy atak csrf
+    if (!state || state !== req.session.oauthState) {
+      return res.status(403).render('error', {
+        user:    null,
+        message: 'Nieprawidlowy parametr state — mozliwy atak CSRF.',
+      })
+    }
+
+    const ep = await getEndpoints()
+
+    // wymiana kodu autoryzacji na tokeny — zadanie idzie serwer-serwer z client_secret
+    // przegladarka nigdy nie widzi sekretu ani tokenow
+    const params = new URLSearchParams({
+      grant_type:    'authorization_code',
+      code,
+      redirect_uri:  REDIRECT_URI,
+      client_id:     CLIENT_ID,
+      client_secret: CLIENT_SECRET,
     })
 
-    const idClaims = tokens.claims()
-    // realm_access.roles jest w access_token, nie w id_token — dekodujemy payload
-    const accessPayload = JSON.parse(
-      Buffer.from(tokens.access_token.split('.')[1], 'base64url').toString()
-    )
+    const tokenRes = await axios.post(ep.token, params, {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      timeout: 5000,
+    })
 
-    req.session.tokens = {
-      access_token:  tokens.access_token,
-      refresh_token: tokens.refresh_token,
-      id_token:      tokens.id_token,
-      expires_at:    tokens.expires_at,
-    }
-    req.session.user = {
-      id:    idClaims.sub,
-      name:  idClaims.preferred_username || idClaims.name,
-      email: idClaims.email || '',
+    const { access_token, refresh_token, id_token } = tokenRes.data
+
+    // dekodujemy payload jwt recznie — base64url -> json
+    const idPayload     = decodeJwtPayload(id_token)
+    // realm_access.roles jest w access_token, nie w id_token
+    const accessPayload = decodeJwtPayload(access_token)
+
+    req.session.tokens = { access_token, refresh_token, id_token }
+    req.session.user   = {
+      id:    idPayload.sub,
+      name:  idPayload.preferred_username || idPayload.name,
+      email: idPayload.email || '',
       roles: accessPayload.realm_access?.roles || [],
     }
     delete req.session.oauthState
 
-    // jawny zapis sesji przed redirectem — zapobiega utracie danych przy szybkim przekierowaniu
+    // jawny zapis sesji przed redirectem — zapobiega utracie danych sesji
     req.session.save(() => res.redirect('/'))
   } catch (err) {
     res.render('error', { user: null, message: 'Blad logowania: ' + err.message })
   }
 })
 
-// wylogowanie — niszczy sesje serwera i przekierowuje do logout keycloaka
+// wylogowanie — niszczy sesje serwera i przekierowuje do logout keycloaka (single logout)
 app.get('/logout', async (req, res) => {
   try {
-    const client   = await getClient()
-    const idToken  = req.session.tokens?.id_token
+    const ep      = await getEndpoints()
+    const idToken = req.session.tokens?.id_token
 
     // najpierw zniszcz lokalna sesje
     req.session.destroy()
 
-    // potem przekieruj na endpoint wylogowania keycloaka (single logout)
-    const logoutUrl = client.endSessionUrl({
-      id_token_hint:             idToken,
-      post_logout_redirect_uri:  'http://localhost:4000/',
+    // przekieruj na endpoint wylogowania keycloaka
+    // id_token_hint pozwala keycloakowi zidentyfikowac sesje do usuniecia
+    const params = new URLSearchParams({
+      id_token_hint:            idToken,
+      post_logout_redirect_uri: 'http://localhost:4000/',
     })
-    res.redirect(logoutUrl)
+
+    res.redirect(`${ep.logout}?${params}`)
   } catch {
     res.redirect('/')
   }
@@ -191,24 +227,24 @@ app.get('/logout', async (req, res) => {
 app.post('/reviews/:id/approve', requireAuth, requireAdminOrModerator, async (req, res) => {
   const token = req.session.tokens.access_token
   try {
-    await axios.patch(`${GATEWAY_URL}/catalog/api/reviews/${req.params.id}/approve`, null, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    await axios.patch(
+      `${GATEWAY_URL}/catalog/api/reviews/${req.params.id}/approve`,
+      null,
+      { headers: { Authorization: `Bearer ${token}` } }
+    )
   } catch (err) {
     console.error('blad zatwierdzania recenzji:', err.message)
   }
   res.redirect('/')
 })
 
-// tymczasowy endpoint diagnostyczny — pokazuje zawartosc sesji
+// endpoint diagnostyczny — pokazuje zawartosc sesji i podglad tokenow
 app.get('/debug', (req, res) => {
   res.json({
     authenticated: !!req.session.tokens,
     user:          req.session.user || null,
     tokenPreview:  req.session.tokens
-      ? req.session.tokens.access_token.split('.').slice(0,2).map(p => {
-          try { return JSON.parse(Buffer.from(p, 'base64').toString()) } catch { return p }
-        })
+      ? [decodeJwtPayload(req.session.tokens.access_token)]
       : null,
   })
 })
