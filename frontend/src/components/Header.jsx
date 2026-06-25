@@ -181,7 +181,7 @@ export default function Header() {
                 </div>
               ) : (
                 <button
-                  onClick={() => keycloak.login()}
+                  onClick={() => keycloak.login({ prompt: 'select_account' })}
                   className="hidden md:flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold font-body uppercase tracking-widest transition-all duration-150"
                   style={{ border: '1px solid rgba(255,45,120,0.3)', color: '#FF2D78' }}
                 >
@@ -299,7 +299,7 @@ export default function Header() {
                 </div>
               ) : (
                 <button
-                  onClick={() => { keycloak.login(); setMenuOpen(false) }}
+                  onClick={() => { keycloak.login({ prompt: 'select_account' }); setMenuOpen(false) }}
                   className="w-full px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-widest font-body text-left flex items-center gap-2"
                   style={{ color: '#FF2D78' }}
                 >

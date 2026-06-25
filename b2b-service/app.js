@@ -180,9 +180,48 @@ function formatTextReport(report) {
   return lines.join('\n')
 }
 
-const PORT = process.env.PORT || 4001
+const PORT          = process.env.PORT || 4001
+// interwal auto-eksportu w ms — domyslnie co godzine
+const EXPORT_INTERVAL_MS = parseInt(process.env.EXPORT_INTERVAL_MS) || 60 * 60 * 1000
+
+async function autoExport() {
+  try {
+    const [products, stats, analytics] = await Promise.all([
+      apiGet('/catalog/api/products'),
+      apiGet('/catalog/api/stats/inventory'),
+      apiGet('/catalog/api/analytics/ratings'),
+    ])
+    const ratingsMap = Object.fromEntries(
+      analytics.map(a => [a.productId, { avg: a.averageRating, count: a.reviewCount }])
+    )
+    const report = {
+      generatedAt: new Date().toISOString(),
+      summary: {
+        totalProducts:   products.length,
+        totalStock:      stats.reduce((s, c) => s + c.totalStock, 0),
+        categoriesCount: stats.length,
+      },
+      inventoryByCategory: stats,
+      products: products.map(p => ({
+        id:       p.id,
+        name:     p.name,
+        category: p.categoryName,
+        minPrice: p.minPrice,
+        rating:   ratingsMap[p.id] || null,
+      })),
+    }
+    const url = await exportReportToSheets(report)
+    console.log(`auto-eksport do sheets: ${url}`)
+  } catch (err) {
+    console.error('blad auto-eksportu:', err.message)
+  }
+}
+
 app.listen(PORT, () => {
   console.log(`b2b-service dziala na http://localhost:${PORT}`)
   console.log(`token endpoint: ${TOKEN_URL}`)
   console.log(`gateway:        ${GATEWAY_URL}`)
+  // auto-eksport uruchamia sie co EXPORT_INTERVAL_MS
+  setInterval(autoExport, EXPORT_INTERVAL_MS)
+  console.log(`auto-eksport co ${EXPORT_INTERVAL_MS / 60000} min`)
 })

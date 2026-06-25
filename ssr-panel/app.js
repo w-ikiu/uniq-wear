@@ -264,10 +264,10 @@ app.get('/logout', async (req, res) => {
     // najpierw zniszcz lokalna sesje
     req.session.destroy()
 
-    // przekieruj na endpoint wylogowania keycloaka
-    // id_token_hint pozwala keycloakowi zidentyfikowac sesje do usuniecia
+    // keycloak 24 wymaga client_id zamiast id_token_hint gdy hostname sie rozni
+    // post_logout_redirect_uri musi byc zarejestrowany w ustawieniach klienta
     const params = new URLSearchParams({
-      id_token_hint:            idToken,
+      client_id:                CLIENT_ID,
       post_logout_redirect_uri: 'http://localhost:4000/',
     })
 

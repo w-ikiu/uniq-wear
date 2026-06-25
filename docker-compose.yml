@@ -126,6 +126,7 @@ services:
       - CLIENT_SECRET=b2b-service-secret-dev
       - GATEWAY_URL=http://uniqwear_gateway:3000
       - SHEETS_SPREADSHEET_ID=1qdJmao5JtsNcwwJWinZnFMV67Jg1mPtHdEScIS9RUX8
+      - EXPORT_INTERVAL_MS=10000
     volumes:
       # klucz google service account montowany jako wolumin — nie commitowany do repo
       - ./b2b-service/google-service-account.json:/app/google-service-account.json:ro
