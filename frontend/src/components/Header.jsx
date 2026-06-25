@@ -5,7 +5,7 @@ import { useCart } from '../CartContext'
 import { useKeycloak } from '../KeycloakContext'
 
 export default function Header() {
-  const { itemCount, openDrawer } = useCart()
+  const { itemCount, openDrawer, clearCart } = useCart()
   const { authenticated, user, keycloak, ready } = useKeycloak()
   const [menuOpen, setMenuOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -171,7 +171,7 @@ export default function Header() {
                     </span>
                   )}
                   <button
-                    onClick={() => keycloak.logout({ redirectUri: window.location.origin })}
+                    onClick={() => { clearCart(); keycloak.logout({ redirectUri: window.location.origin }) }}
                     className="p-2 rounded-xl text-zinc-500 hover:text-[#FF2D78] transition-colors"
                     aria-label="Wyloguj"
                     title="Wyloguj"
@@ -290,7 +290,7 @@ export default function Header() {
                 <div className="flex items-center justify-between px-4 py-2">
                   <span className="text-[10px] text-zinc-500 font-body uppercase">{user?.name}</span>
                   <button
-                    onClick={() => { keycloak.logout({ redirectUri: window.location.origin }); setMenuOpen(false) }}
+                    onClick={() => { clearCart(); keycloak.logout({ redirectUri: window.location.origin }); setMenuOpen(false) }}
                     className="text-xs font-bold font-body uppercase tracking-widest flex items-center gap-1.5"
                     style={{ color: '#FF2D78' }}
                   >

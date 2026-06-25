@@ -58,6 +58,7 @@ export function KeycloakProvider({ children }) {
     keycloak.onTokenExpired = () => {
       keycloak.updateToken(60).catch(() => keycloak.logout())
     }
+
   }, [])
 
   return (

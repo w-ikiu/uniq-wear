@@ -9,13 +9,21 @@ app.set('view engine', 'ejs')
 app.set('views', './views')
 app.use(express.urlencoded({ extended: false }))
 
-const KEYCLOAK_URL  = process.env.KEYCLOAK_URL   || 'http://localhost:8080'
+const KEYCLOAK_URL  = process.env.KEYCLOAK_URL    || 'http://localhost:8080'
+// publiczny adres keycloaka — uzywany do redirectow przegladarki (auth, logout)
+// rozny od KEYCLOAK_URL ktory wskazuje na kontener w sieci docker
+const KC_PUBLIC_URL = process.env.KC_PUBLIC_URL   || 'http://localhost:8080'
 const REALM         = process.env.KEYCLOAK_REALM  || 'uniqwear'
 const CLIENT_ID     = 'ssr-panel'
 // sekret klienta — przechowywany tylko po stronie serwera, nigdy nie trafia do przegladarki
 const CLIENT_SECRET = process.env.CLIENT_SECRET   || 'ssr-panel-secret-dev'
 const REDIRECT_URI  = process.env.REDIRECT_URI    || 'http://localhost:4000/callback'
 const GATEWAY_URL   = process.env.GATEWAY_URL     || 'http://localhost:3000'
+// dane admina keycloaka — uzywane do wywolan admin rest api (zarzadzanie uzytkownikami)
+const KC_ADMIN_USER = process.env.KC_ADMIN      || 'admin'
+const KC_ADMIN_PASS = process.env.KC_ADMIN_PASS || 'admin'
+// role aplikacyjne dostepne do przypisania
+const APP_ROLES     = ['admin', 'moderator', 'user']
 
 // sesja serwerowa — token zyje w pamieci serwera, nie w localStorage przegladarki
 app.use(session({
@@ -30,23 +38,18 @@ app.use(session({
   },
 }))
 
-// cache endpointow z discovery — pobieramy raz, nie przy kazdym zadaniu
-let oidcEndpoints = null
-
-// discovery pobiera adresy endpointow keycloaka z dobrze znango url
-// dzieki temu nie hardkodujemy adresow token/auth/logout endpoint
-async function getEndpoints() {
-  if (oidcEndpoints) return oidcEndpoints
-  const res = await axios.get(
-    `${KEYCLOAK_URL}/realms/${REALM}/.well-known/openid-configuration`,
-    { timeout: 5000 }
-  )
-  oidcEndpoints = {
-    auth:   res.data.authorization_endpoint,
-    token:  res.data.token_endpoint,
-    logout: res.data.end_session_endpoint,
+// keycloak 24 ma bug w discovery endpoint przy wywolaniach z sieci docker (requestHost is null)
+// endpointy sa zawsze pod tymi samymi sciezkami — pomijamy discovery call
+// auth i logout uzywaja KC_PUBLIC_URL bo przeglądarka jest tam przekierowywana
+// token uzywaja KEYCLOAK_URL (wywolanie serwer-serwer przez siec docker)
+function getEndpoints() {
+  const pub  = `${KC_PUBLIC_URL}/realms/${REALM}/protocol/openid-connect`
+  const priv = `${KEYCLOAK_URL}/realms/${REALM}/protocol/openid-connect`
+  return {
+    auth:   `${pub}/auth`,
+    token:  `${priv}/token`,
+    logout: `${pub}/logout`,
   }
-  return oidcEndpoints
 }
 
 // losowy state — 32 bajty = 64 znaki hex — ochrona przed atakami csrf
@@ -69,6 +72,22 @@ async function apiGet(path, token) {
   return res.data
 }
 
+// pobiera token admina z realmu master — potrzebny do keycloak admin rest api
+// token uzytkownika z realmu uniqwear nie ma uprawnien do admin api
+async function getAdminToken() {
+  const res = await axios.post(
+    `${KEYCLOAK_URL}/realms/master/protocol/openid-connect/token`,
+    new URLSearchParams({
+      grant_type: 'password',
+      client_id:  'admin-cli',
+      username:   KC_ADMIN_USER,
+      password:   KC_ADMIN_PASS,
+    }),
+    { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, timeout: 5000 }
+  )
+  return res.data.access_token
+}
+
 // middleware — wymaga zalogowanej sesji
 function requireAuth(req, res, next) {
   if (!req.session.tokens) return res.redirect('/login')
@@ -87,6 +106,18 @@ function requireAdminOrModerator(req, res, next) {
   next()
 }
 
+// middleware — wymaga roli admin
+function requireAdmin(req, res, next) {
+  const roles = req.session.user?.roles || []
+  if (!roles.includes('admin')) {
+    return res.status(403).render('error', {
+      user:    req.session.user,
+      message: 'Brak uprawnien — wymagana rola admin.',
+    })
+  }
+  next()
+}
+
 // dashboard — admin widzi wszystko, moderator tylko recenzje
 app.get('/', requireAuth, requireAdminOrModerator, async (req, res) => {
   const token   = req.session.tokens.access_token
@@ -94,17 +125,39 @@ app.get('/', requireAuth, requireAdminOrModerator, async (req, res) => {
   const isAdmin = roles.includes('admin')
 
   try {
-    let orders = [], stats = [], analytics = []
+    let orders = [], stats = [], analytics = [], users = []
     // moderator pobiera tylko recenzje — nie ma dostepu do zamowien i statystyk
     const pendingReviews = await apiGet('/catalog/api/reviews?status=pending', token)
 
     if (isAdmin) {
-      // admin pobiera wszystkie dane rownolegле
-      ;[orders, stats, analytics] = await Promise.all([
-        apiGet('/checkout/api/orders', token).then(d => d.slice(0, 10)),
-        apiGet('/catalog/api/stats/inventory', token),
-        axios.get(`${GATEWAY_URL}/catalog/api/analytics/ratings`, { timeout: 5000 }).then(r => r.data.slice(0, 10)),
+      // admin pobiera dane aplikacyjne i liste uzytkownikow rownolegле
+      const [appData, adminToken] = await Promise.all([
+        Promise.all([
+          apiGet('/checkout/api/orders', token).then(d => d.slice(0, 10)),
+          apiGet('/catalog/api/stats/inventory', token),
+          axios.get(`${GATEWAY_URL}/catalog/api/analytics/ratings`, { timeout: 5000 }).then(r => r.data.slice(0, 10)),
+        ]),
+        getAdminToken(),
       ])
+      ;[orders, stats, analytics] = appData
+
+      // pobierz liste uzytkownikow z keycloak admin api
+      const usersRes = await axios.get(
+        `${KEYCLOAK_URL}/admin/realms/${REALM}/users?max=50`,
+        { headers: { Authorization: `Bearer ${adminToken}` }, timeout: 5000 }
+      )
+
+      // dla kazdego uzytkownika pobierz jego role (rownolegле)
+      users = await Promise.all(usersRes.data.map(async u => {
+        const rolesRes = await axios.get(
+          `${KEYCLOAK_URL}/admin/realms/${REALM}/users/${u.id}/role-mappings/realm`,
+          { headers: { Authorization: `Bearer ${adminToken}` }, timeout: 5000 }
+        )
+        const appRoles = rolesRes.data
+          .filter(r => APP_ROLES.includes(r.name))
+          .map(r => r.name)
+        return { id: u.id, username: u.username, email: u.email || '', enabled: u.enabled, roles: appRoles }
+      }))
     }
 
     res.render('dashboard', {
@@ -114,6 +167,7 @@ app.get('/', requireAuth, requireAdminOrModerator, async (req, res) => {
       reviews: pendingReviews.slice(0, 20),
       stats,
       analytics,
+      users,
     })
   } catch (err) {
     const status = err.response?.status || 500
@@ -234,6 +288,66 @@ app.post('/reviews/:id/approve', requireAuth, requireAdminOrModerator, async (re
     )
   } catch (err) {
     console.error('blad zatwierdzania recenzji:', err.message)
+  }
+  res.redirect('/')
+})
+
+// przypisanie roli uzytkownikowi — tylko admin, przez keycloak admin api
+app.post('/users/:id/role/add', requireAuth, requireAdmin, async (req, res) => {
+  const { role } = req.body
+  if (!APP_ROLES.includes(role)) return res.redirect('/')
+  try {
+    const adminToken = await getAdminToken()
+    // pobierz obiekt roli zeby uzyskac jej id — keycloak wymaga id przy przypisaniu
+    const roleRes = await axios.get(
+      `${KEYCLOAK_URL}/admin/realms/${REALM}/roles/${role}`,
+      { headers: { Authorization: `Bearer ${adminToken}` }, timeout: 5000 }
+    )
+    await axios.post(
+      `${KEYCLOAK_URL}/admin/realms/${REALM}/users/${req.params.id}/role-mappings/realm`,
+      [roleRes.data],
+      { headers: { Authorization: `Bearer ${adminToken}`, 'Content-Type': 'application/json' } }
+    )
+  } catch (err) {
+    console.error('blad przypisywania roli:', err.message)
+  }
+  res.redirect('/')
+})
+
+// usuniecie roli uzytkownikowi — z ochrona: zawsze musi istniec co najmniej jeden admin
+app.post('/users/:id/role/remove', requireAuth, requireAdmin, async (req, res) => {
+  const { role } = req.body
+  if (!APP_ROLES.includes(role)) return res.redirect('/')
+  try {
+    const adminToken = await getAdminToken()
+
+    // zabezpieczenie — nie pozwol usunac roli admin jesli to ostatni administrator
+    if (role === 'admin') {
+      const adminsRes = await axios.get(
+        `${KEYCLOAK_URL}/admin/realms/${REALM}/roles/admin/users`,
+        { headers: { Authorization: `Bearer ${adminToken}` }, timeout: 5000 }
+      )
+      if (adminsRes.data.length <= 1) {
+        return res.status(400).render('error', {
+          user:    req.session.user,
+          message: 'Nie mozna usunac roli admin — musi istniec co najmniej jeden administrator.',
+        })
+      }
+    }
+
+    const roleRes = await axios.get(
+      `${KEYCLOAK_URL}/admin/realms/${REALM}/roles/${role}`,
+      { headers: { Authorization: `Bearer ${adminToken}` }, timeout: 5000 }
+    )
+    await axios.delete(
+      `${KEYCLOAK_URL}/admin/realms/${REALM}/users/${req.params.id}/role-mappings/realm`,
+      {
+        headers: { Authorization: `Bearer ${adminToken}`, 'Content-Type': 'application/json' },
+        data:    [roleRes.data],
+      }
+    )
+  } catch (err) {
+    console.error('blad usuwania roli:', err.message)
   }
   res.redirect('/')
 })

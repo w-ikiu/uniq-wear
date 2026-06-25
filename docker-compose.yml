@@ -34,6 +34,11 @@ services:
       KC_DB_PASSWORD: ${POSTGRES_PASSWORD:-uniqwear_pass}
       KEYCLOAK_ADMIN: ${KC_ADMIN:-admin}
       KEYCLOAK_ADMIN_PASSWORD: ${KC_ADMIN_PASSWORD:-admin}
+      # wymagane w keycloak 24 — bez tego pojawia sie NullPointerException przy wywolaniach z sieci docker
+      KC_HOSTNAME: "localhost"
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_STRICT_HTTPS: "false"
+      KC_HOSTNAME_STRICT_BACKCHANNEL: "false"
     volumes:
       # realm-export.json zostanie zaladowany przy starcie keycloaka
       - ./keycloak:/opt/keycloak/data/import
@@ -126,6 +131,30 @@ services:
       - ./b2b-service/google-service-account.json:/app/google-service-account.json:ro
     depends_on:
       keycloak:
+        condition: service_started
+
+  # panel admina ssr — authorization code flow, token w sesji serwerowej
+  ssr-panel:
+    build:
+      context: ./ssr-panel
+      dockerfile: Dockerfile
+    container_name: uniqwear_ssr
+    ports:
+      - "4000:4000"
+    environment:
+      - KEYCLOAK_URL=http://uniqwear_keycloak:8080
+      - KC_PUBLIC_URL=http://localhost:8080
+      - KEYCLOAK_REALM=uniqwear
+      - CLIENT_SECRET=ssr-panel-secret-dev
+      - REDIRECT_URI=http://localhost:4000/callback
+      - GATEWAY_URL=http://uniqwear_gateway:3000
+      - KC_ADMIN=admin
+      - KC_ADMIN_PASS=admin
+      - SESSION_SECRET=ssr-session-secret-dev
+    depends_on:
+      keycloak:
+        condition: service_started
+      gateway:
         condition: service_started
 
   # t8b: api gateway - pojedynczy punkt wejscia dla wszystkich serwisow

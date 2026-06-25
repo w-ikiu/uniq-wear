@@ -95,6 +95,19 @@
     .stat-label { font-size: .65rem; color: #71717a; text-transform: uppercase; letter-spacing: .1em }
     .stat-val   { font-size: .85rem; font-weight: 700; color: #CCFF00 }
     .rating-val { font-size: .85rem; font-weight: 700; color: #FF2D78 }
+
+    .role-tag { display: inline-block; padding: .12rem .4rem; border-radius: 999px; font-size: .58rem; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; margin-right: .2rem }
+    .role-admin     { background: rgba(255,45,120,.1);   color: #FF2D78; border: 1px solid rgba(255,45,120,.25) }
+    .role-moderator { background: rgba(139,92,246,.1);   color: #a78bfa; border: 1px solid rgba(139,92,246,.25) }
+    .role-user      { background: rgba(204,255,0,.08);   color: #CCFF00; border: 1px solid rgba(204,255,0,.2) }
+
+    .select-role { background: #1a1a1a; border: 1px solid rgba(255,255,255,.1); color: #e4e4e7; border-radius: 6px; font-size: .65rem; padding: .2rem .4rem; cursor: pointer }
+    .btn-sm { padding: .2rem .5rem; font-size: .6rem }
+    .btn-add { font-size: .6rem; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; padding: .2rem .5rem; border-radius: 6px; cursor: pointer; background: rgba(204,255,0,.08); color: #CCFF00; border: 1px solid rgba(204,255,0,.25) }
+    .btn-add:hover { background: rgba(204,255,0,.15) }
+    .btn-rem { font-size: .58rem; font-weight: 700; text-transform: uppercase; padding: .15rem .4rem; border-radius: 6px; cursor: pointer; background: rgba(255,45,120,.08); color: #FF2D78; border: 1px solid rgba(255,45,120,.2); margin-right: .2rem }
+    .btn-rem:hover { background: rgba(255,45,120,.15) }
+    .user-disabled { opacity: .4 }
   </style>
 </head>
 <body>
@@ -222,6 +235,62 @@
         </table>
       <% } %>
     </div>
+
+    <!-- zarzadzanie uzytkownikami — tylko admin -->
+    <% if (typeof users !== 'undefined' && users.length > 0) { %>
+    <div class="card grid-full">
+      <div class="card-title">
+        Zarządzanie użytkownikami <span class="count"><%= users.length %></span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Użytkownik</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th>Przypisz rolę</th>
+            <th>Usuń rolę</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% users.forEach(u => {
+               const available = ['admin','moderator','user'].filter(r => !u.roles.includes(r))
+          %>
+          <tr class="<%= u.enabled ? '' : 'user-disabled' %>">
+            <td class="mono"><%= u.username %></td>
+            <td><%= u.email || '—' %></td>
+            <td>
+              <% u.roles.forEach(r => { %>
+                <span class="role-tag role-<%= r %>"><%= r %></span>
+              <% }) %>
+              <% if (u.roles.length === 0) { %><span style="color:#3f3f46">brak</span><% } %>
+            </td>
+            <td>
+              <% if (available.length > 0) { %>
+              <form method="POST" action="/users/<%= u.id %>/role/add" style="display:flex;gap:.35rem;align-items:center">
+                <select name="role" class="select-role">
+                  <% available.forEach(r => { %><option value="<%= r %>"><%= r %></option><% }) %>
+                </select>
+                <button class="btn-add btn-sm">+ przypisz</button>
+              </form>
+              <% } else { %>
+                <span style="color:#3f3f46;font-size:.65rem">wszystkie przypisane</span>
+              <% } %>
+            </td>
+            <td>
+              <% u.roles.forEach(r => { %>
+              <form method="POST" action="/users/<%= u.id %>/role/remove" style="display:inline">
+                <input type="hidden" name="role" value="<%= r %>">
+                <button class="btn-rem"><%= r %> ✕</button>
+              </form>
+              <% }) %>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <% } %>
 
     <% } %>
 

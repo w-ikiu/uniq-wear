@@ -64,7 +64,11 @@ export function CartProvider({ children }) {
     addItem: (item) => dispatch({ type: 'ADD', item }),
     removeItem: (sku) => dispatch({ type: 'REMOVE', sku }),
     setQty: (sku, quantity) => dispatch({ type: 'SET_QTY', sku, quantity }),
-    clearCart: () => dispatch({ type: 'CLEAR' }),
+    // usuwa rowniez bezposrednio z localStorage — effect moze nie zdazyc przed nawigacja
+    clearCart: () => {
+      dispatch({ type: 'CLEAR' })
+      localStorage.removeItem(STORAGE_KEY)
+    },
     openDrawer: () => dispatch({ type: 'TOGGLE_DRAWER', open: true }),
     closeDrawer: () => dispatch({ type: 'TOGGLE_DRAWER', open: false }),
   }
